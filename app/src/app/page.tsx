@@ -30,6 +30,8 @@ export default function LandingPage() {
   const [mlAuth, setMlAuth] = useState<MLAuthStatus | null>(null);
   const isLoading = step === "searching" || step === "done";
 
+  const [mlAuthError, setMlAuthError] = useState(false);
+
   // Verificar auth status al cargar
   useEffect(() => {
     fetch("/api/auth/ml/status")
@@ -37,8 +39,11 @@ export default function LandingPage() {
       .then(setMlAuth)
       .catch(() => setMlAuth({ isAuthenticated: false, userId: null }));
 
-    // Si viene de un auth redirect, limpiar params de la URL
+    // Detectar resultado del redirect OAuth
     const url = new URL(window.location.href);
+    if (url.searchParams.get("ml_auth") === "error") {
+      setMlAuthError(true);
+    }
     if (url.searchParams.has("ml_auth")) {
       url.searchParams.delete("ml_auth");
       window.history.replaceState({}, "", url.toString());
@@ -108,6 +113,19 @@ export default function LandingPage() {
               </p>
 
               <div className="space-y-4">
+                {/* Error banner OAuth ML */}
+                {mlAuthError && (
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm bg-error-container text-on-error-container">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-base">error</span>
+                      <span>No se pudo conectar con ML. Probá con otra cuenta de MercadoLibre.</span>
+                    </div>
+                    <button onClick={() => setMlAuthError(false)}>
+                      <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* ML Auth Banner */}
                 {mlAuth !== null && (
                   <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium ${
