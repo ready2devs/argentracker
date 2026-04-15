@@ -16,6 +16,7 @@ interface SearchOutput {
   avgPrice: number;
   totalResults: number;
   fromCache: boolean;
+  isMock: boolean;
   durationMs: number;
 }
 
@@ -135,8 +136,16 @@ function ResultsContent() {
 
   return (
     <>
+      {/* Mock data banner */}
+      {data.isMock && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-secondary-container text-on-secondary-container text-sm font-medium rounded-xl">
+          <span className="material-symbols-outlined text-base">science</span>
+          <span>Mostrando datos de muestra — la integración con ML está en configuración.</span>
+        </div>
+      )}
+
       {/* Cache badge */}
-      {data.fromCache && (
+      {data.fromCache && !data.isMock && (
         <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full">
           <span className="material-symbols-outlined text-sm">cached</span>
           Resultado en caché · {data.durationMs}ms
