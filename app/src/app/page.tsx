@@ -90,10 +90,6 @@ export default function LandingPage() {
     handleSearch(query, "url");
   };
 
-  const handleScreenshotUpload = (file: File) => {
-    const name = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").trim();
-    handleSearch(name, "screenshot");
-  };
 
   return (
     <>
@@ -127,7 +123,7 @@ export default function LandingPage() {
                 )}
 
                 <SearchInput onSearch={handleUrlSearch} isLoading={isLoading} />
-                <ScreenshotUpload onUpload={handleScreenshotUpload} isLoading={isLoading} />
+                <ScreenshotUpload onSearch={handleSearch} isLoading={isLoading} />
 
                 {/* Status feedback */}
                 {step !== "idle" && (
