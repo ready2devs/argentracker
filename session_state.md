@@ -26,14 +26,17 @@
 
 ### Fase 3 — Gemini Vision (NUEVA)
 - [x] `/api/vision` — Endpoint que recibe imagen base64 y devuelve producto detectado
-- [x] `ScreenshotUpload` reescrito con estados: idle / analyzing / done / error
-- [x] Modelo: `gemini-2.0-flash` via v1 API (native fetch — SDK atado a v1beta)
+- [x] `ScreenshotUpload` reescrito con estados: idle / analyzing / retrying / done / error
+- [x] Auto-retry con countdown 30s en caso de 429 quota
+- [x] Modelo: `gemini-2.5-flash-lite` (stable ID, v1 API, alto RPM)
+  - ⚠️ El preview `-04-17` fue shut down — usar el stable sin fecha
+  - ⚠️ `gemini-2.0-flash` también funciona como fallback
 - [x] Rotación automática de 3 API keys (429 → siguiente key)
-- [x] Variables agregadas a `.env.local`:
-  - `GEMINI_API_KEY` = AIzaSyDFLllLUismgB1w2pJ-eFTTFPpZgpi3lCM
-  - `GEMINI_API_KEY_2` = AIzaSyArONj58rjdlmdDuQ0OneSLBhuk5VWur0M
-  - `GEMINI_API_KEY_3` = AIzaSyAAYWPDZPwCigpc66Z5P3BOzjbDxX75sVs
-- [x] **En Vercel**: agregar las 3 keys en Settings → Environment Variables
+- [x] Variables en `.env.local`:
+  - `GEMINI_API_KEY` (key1)
+  - `GEMINI_API_KEY_2` (key2)
+  - `GEMINI_API_KEY_3` (key3)
+- [x] **En Vercel**: verificar que GEMINI_API_KEY_2 y _3 estén agregadas
 
 ---
 
@@ -55,25 +58,26 @@
 
 ## ⚠️ Issues Conocidos
 
-### 1. Gemini Vision → 429 Quota (en testing)
-- **Causa**: Tests intensivos agotaron el rate limit de las 3 keys (free tier = 15 RPM)
-- **Fix**: Esperar 1-2 min sin tests. En uso normal (1 req/usuario) nunca se satura.
-- **Modelos disponibles con AI Studio free keys**: solo `gemini-2.0-flash` (v1 API)
-- **Gemini 2.5 preview** requiere paid tier o Workspace — da 404 con estas keys.
+### 1. Gemini Vision — Modelo y Rate Limits
+- **Modelo final**: `gemini-2.5-flash-lite` (stable, alto RPM, soporta imágenes)
+- El preview `-04-17` fue SHUT DOWN por Google — siempre usar el stable sin fecha
+- Las 3 keys se saturaron hoy por testing intensivo — en uso normal no se saturan
+- **Mañana**: probar con quotas reseteadas, debería funcionar de primera
 
 ### 2. ML OAuth → App en modo "test"
-- **Causa**: ML requiere certificación para producción (proceso manual en su portal)
-- **Fix**: Solicitar producción en developers.mercadolibre.com.ar → Tu App → Seguridad
+- **Causa**: ML requiere certificación para producción
+- **Fix**: Solicitar producción en developers.mercadolibre.com.ar
 - **Workaround actual**: Mock data funcional con links reales a ML
 
 ---
 
-## 🔜 Próximos Pasos — Fase 3 Continuación
+## 🔜 Próximos Pasos — Mañana
 
-1. **Verificar Vision en uso real** (abrir app, subir captura, esperar quota reset)
-2. **ML Certificación**: Completar el formulario de seguridad en ML Developers
-3. **Cloudflare Worker proxy**: Para bypass del bloqueo 403 de ML API sin OAuth
+1. **Verificar Vision** con quotas reseteadas (subir captura → debería detectar producto)
+2. **Agregar más API keys** de Gemini para más capacidad
+3. **ML Certificación**: Completar el formulario de seguridad en ML Developers
 4. **Supabase cache**: Guardar resultados de búsqueda para evitar re-fetch
+5. **ML API real**: Conectar búsquedas reales una vez resuelto el OAuth
 
 ---
 
