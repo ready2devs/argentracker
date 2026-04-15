@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ArgenTracker - PlayStation 5 Slim 1TB</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error": "#ffffff",
+                    "surface-container-low": "#f1f4f5",
+                    "on-error-container": "#93000a",
+                    "on-background": "#181c1d",
+                    "on-surface-variant": "#40484c",
+                    "surface-variant": "#e0e3e4",
+                    "surface-container": "#ebeeef",
+                    "on-secondary-container": "#006d7b",
+                    "on-tertiary-container": "#2dcb70",
+                    "on-tertiary-fixed-variant": "#005228",
+                    "surface-bright": "#f7fafb",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed": "#001f25",
+                    "secondary-container": "#94edff",
+                    "surface": "#f7fafb",
+                    "primary-container": "#004b62",
+                    "inverse-on-surface": "#eef1f2",
+                    "outline-variant": "#c0c7cd",
+                    "background": "#f7fafb",
+                    "primary-fixed": "#bee9ff",
+                    "primary": "#003344",
+                    "on-primary-container": "#7cbbd9",
+                    "surface-tint": "#1f6580",
+                    "tertiary-container": "#005026",
+                    "surface-dim": "#d7dadb",
+                    "on-primary-fixed": "#001f2a",
+                    "on-primary-fixed-variant": "#004d65",
+                    "outline": "#71787d",
+                    "primary-fixed-dim": "#90cfed",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed": "#6bfe9c",
+                    "tertiary-fixed-dim": "#4ae183",
+                    "surface-container-highest": "#e0e3e4",
+                    "secondary": "#006876",
+                    "on-primary": "#ffffff",
+                    "on-secondary-fixed-variant": "#004e59",
+                    "on-tertiary-fixed": "#00210c",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#2d3132",
+                    "surface-container-high": "#e5e9ea",
+                    "inverse-primary": "#90cfed",
+                    "on-surface": "#181c1d",
+                    "secondary-fixed-dim": "#7ad4e5",
+                    "tertiary": "#003718",
+                    "secondary-fixed": "#a0efff",
+                    "on-secondary": "#ffffff",
+                    "surface-container-lowest": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-header {
+            background: rgba(247, 250, 251, 0.8);
+            backdrop-filter: blur(20px);
+        }
+        .bento-card {
+            transition: transform 0.2s ease;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md">
+<div class="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-black tracking-tight text-cyan-950 dark:text-cyan-50 font-headline">ArgenTracker</span>
+<div class="hidden md:flex gap-6 items-center">
+<a class="text-cyan-950 dark:text-cyan-50 border-b-2 border-cyan-900 dark:border-cyan-400 pb-1 font-medium" href="#">Explore</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors" href="#">History</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors" href="#">Saved</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center bg-surface-container-highest rounded-full px-4 py-2 w-64">
+<span class="material-symbols-outlined text-on-surface-variant mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-full p-0" placeholder="Search prices..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-slate-500 hover:text-cyan-700 transition-all active:opacity-80 scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:text-cyan-700 transition-all active:opacity-80 scale-95">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</div>
+</div>
+</nav>
+<main class="pt-24 pb-12 px-6 max-w-7xl mx-auto">
+<!-- Search Header -->
+<header class="mb-10">
+<nav class="flex items-center gap-2 text-sm text-on-surface-variant mb-4">
+<span class="hover:text-primary cursor-pointer">Inicio</span>
+<span class="material-symbols-outlined text-xs" data-icon="chevron_right">chevron_right</span>
+<span class="hover:text-primary cursor-pointer">Consolas</span>
+<span class="material-symbols-outlined text-xs" data-icon="chevron_right">chevron_right</span>
+<span class="font-semibold text-on-surface">Búsqueda</span>
+</nav>
+<h1 class="text-3xl md:text-4xl font-headline font-extrabold tracking-tight text-primary">Resultados para: PlayStation 5 Slim 1TB</h1>
+</header>
+<!-- Product Summary -->
+<section class="mb-12">
+<div class="bg-surface-container-lowest rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 shadow-sm">
+<div class="w-full md:w-1/3 bg-surface-container rounded-lg overflow-hidden flex items-center justify-center p-4">
+<img alt="PS5 Slim console" class="h-48 object-contain" data-alt="Modern sleek white video game console on a minimalist wooden stand with soft architectural lighting and clean aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-ZRPitF1yyoEgKhzuR87lagY_tQ6FwRTNU25KzWtLoaQ2ky4ug_IKJvi8O6LTBk2hTKgReNiP4cA47HLTVQaZXuqu22WvAKF9MG4vsaBWlobM-mSbedfR0mebyDAriSUHSatR3kw9D6zKuFKq7HkPQFmb5fTwSLWWd_197cYq3mPkd1zgMrqP_syhihBbilL9vbnx3qiUM7DMzFGeHSj2x-F71Iwyrwf2oU1ZEK1ZzaiCOFKT_N8wu4ZnIfCSTqLtTDDVZP4BDH1x"/>
+</div>
+<div class="w-full md:w-2/3">
+<div class="flex flex-col gap-2">
+<span class="inline-flex px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full w-fit">REFERENCIA</span>
+<h2 class="text-2xl font-headline font-bold text-on-surface">Sony PlayStation 5 Slim 1TB White</h2>
+<p class="text-on-surface-variant text-sm max-w-md">Especificaciones: Procesador AMD Zen 2, SSD de alta velocidad 1TB, 4K HDR, Compatible con Ray Tracing.</p>
+<div class="mt-4">
+<span class="text-sm text-on-surface-variant block mb-1">Precio Promedio de Mercado</span>
+<span class="text-3xl font-headline font-extrabold text-primary">$1.240.000,00 ARS</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Best Options Cards -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+<!-- Best New -->
+<div class="bg-surface-container-lowest rounded-xl p-8 border-l-8 border-primary relative overflow-hidden group hover:shadow-xl transition-all">
+<div class="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-9xl" data-icon="new_releases">new_releases</span>
+</div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="text-sm font-bold uppercase tracking-wider text-primary opacity-70">Mejor Precio NUEVO</span>
+<h3 class="text-4xl font-headline font-black text-primary mt-1">$945.000</h3>
+</div>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-lg font-bold text-sm animate-pulse">23% OFF</span>
+</div>
+<div class="space-y-4 mb-8">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="verified_user">verified_user</span>
+<span class="text-sm">Vendedor Platinum - MercadoLibre</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-tertiary-fixed-dim" data-icon="local_shipping">local_shipping</span>
+<span class="text-sm">Envío gratis a todo el país</span>
+</div>
+</div>
+<button class="w-full py-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-all">
+                        Ir a la oferta
+                        <span class="material-symbols-outlined" data-icon="arrow_outward">arrow_outward</span>
+</button>
+</div>
+</div>
+<!-- Best Used -->
+<div class="bg-surface-container-lowest rounded-xl p-8 border-l-8 border-on-secondary-container relative overflow-hidden group hover:shadow-xl transition-all">
+<div class="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-9xl" data-icon="history">history</span>
+</div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="text-sm font-bold uppercase tracking-wider text-on-secondary-container opacity-70">Mejor Precio USADO</span>
+<h3 class="text-4xl font-headline font-black text-on-secondary-container mt-1">$720.000</h3>
+</div>
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-lg font-bold text-sm">RECOMENDADO</span>
+</div>
+<div class="space-y-4 mb-8">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-on-secondary-container" data-icon="info">info</span>
+<span class="text-sm">Estado: Como nuevo (6 meses de uso)</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-on-secondary-container" data-icon="location_on">location_on</span>
+<span class="text-sm">Ubicación: Belgrano, CABA</span>
+</div>
+</div>
+<button class="w-full py-4 bg-on-secondary-container text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                        Ir a la oferta
+                        <span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Other Options List -->
+<section class="bg-surface-container-low rounded-2xl p-8">
+<div class="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+<div>
+<h3 class="text-2xl font-headline font-bold text-primary">Otras opciones recomendadas</h3>
+<p class="text-on-surface-variant text-sm mt-1">Actualizado hace 4 minutos</p>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 bg-surface-container-highest rounded-full text-sm font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+                        Filtros
+                    </button>
+<button class="px-4 py-2 bg-surface-container-highest rounded-full text-sm font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="swap_vert">swap_vert</span>
+                        Ordenar por precio
+                    </button>
+</div>
+</div>
+<!-- List Layout (High-end Alternative to Table) -->
+<div class="space-y-3">
+<!-- Row 1 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-wrap md:flex-nowrap items-center justify-between gap-4 group hover:scale-[1.01] transition-transform">
+<div class="flex items-center gap-4 w-full md:w-1/3">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center font-bold text-primary">ML</div>
+<div>
+<span class="block text-xs font-bold text-primary-fixed-variant uppercase">MERCADOLIBRE</span>
+<span class="font-semibold text-on-surface">Electrosale AR</span>
+</div>
+</div>
+<div class="flex flex-col items-start md:items-center w-1/2 md:w-1/4">
+<span class="text-xs text-on-surface-variant mb-1">Condición</span>
+<span class="px-3 py-1 bg-surface-container text-on-surface text-xs font-bold rounded-full">NUEVO</span>
+</div>
+<div class="flex flex-col items-start md:items-center w-1/2 md:w-1/4">
+<span class="text-xs text-on-surface-variant mb-1">Reputación</span>
+<div class="flex gap-1">
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+</div>
+</div>
+<div class="flex flex-col items-end w-full md:w-1/6">
+<span class="text-xl font-black text-primary">$998.500</span>
+<span class="text-[10px] text-tertiary-fixed-variant font-bold">12 CUOTAS SIN INT.</span>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-wrap md:flex-nowrap items-center justify-between gap-4 group hover:scale-[1.01] transition-transform">
+<div class="flex items-center gap-4 w-full md:w-1/3">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center font-bold text-primary">AM</div>
+<div>
+<span class="block text-xs font-bold text-primary-fixed-variant uppercase">AMAZON IMPORT</span>
+<span class="font-semibold text-on-surface">Tienda Gamer X</span>
+</div>
+</div>
+<div class="flex flex-col items-start md:items-center w-1/2 md:w-1/4">
+<span class="text-xs text-on-surface-variant mb-1">Condición</span>
+<span class="px-3 py-1 bg-surface-container text-on-surface text-xs font-bold rounded-full">NUEVO</span>
+</div>
+<div class="flex flex-col items-start md:items-center w-1/2 md:w-1/4">
+<span class="text-xs text-on-surface-variant mb-1">Reputación</span>
+<div class="flex gap-1">
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-outline-variant rounded-full"></div>
+<div class="w-4 h-1 bg-outline-variant rounded-full"></div>
+</div>
+</div>
+<div class="flex flex-col items-end w-full md:w-1/6">
+<span class="text-xl font-black text-primary">$1.020.000</span>
+<span class="text-[10px] text-on-surface-variant font-bold">ENVÍO INTERNACIONAL</span>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-wrap md:flex-nowrap items-center justify-between gap-4 group hover:scale-[1.01] transition-transform">
+<div class="flex items-center gap-4 w-full md:w-1/3">
+<div class="w-12 h-12 rounded-lg bg-secondary-container flex items-center justify-center font-bold text-on-secondary-container">FB</div>
+<div>
+<span class="block text-xs font-bold text-on-secondary-container uppercase">MARKETPLACE</span>
+<span class="font-semibold text-on-surface">Julian G. (Particular)</span>
+</div>
+</div>
+<div class="flex flex-col items-start md:items-center w-1/2 md:w-1/4">
+<span class="text-xs text-on-surface-variant mb-1">Condición</span>
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full">USADO</span>
+</div>
+<div class="flex flex-col items-start md:items-center w-1/2 md:w-1/4">
+<span class="text-xs text-on-surface-variant mb-1">Reputación</span>
+<div class="flex gap-1">
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-tertiary-fixed rounded-full"></div>
+<div class="w-4 h-1 bg-outline-variant rounded-full"></div>
+</div>
+</div>
+<div class="flex flex-col items-end w-full md:w-1/6">
+<span class="text-xl font-black text-on-secondary-container">$750.000</span>
+<span class="text-[10px] text-error font-bold">EFECTIVO / TRANSFERENCIA</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full mt-auto bg-slate-100 dark:bg-slate-950 font-inter text-sm">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 py-12 gap-4 max-w-7xl mx-auto">
+<div class="flex flex-col gap-2">
+<span class="font-manrope font-extrabold text-cyan-900 text-lg">ArgenTracker</span>
+<span class="text-slate-500">© 2024 ArgenTracker. Independent price monitoring for Argentina.</span>
+</div>
+<div class="flex gap-6">
+<a class="text-slate-500 hover:text-cyan-800 dark:hover:text-cyan-200 underline underline-offset-4 transition-opacity opacity-90 hover:opacity-100" href="#">About us</a>
+<a class="text-slate-500 hover:text-cyan-800 dark:hover:text-cyan-200 underline underline-offset-4 transition-opacity opacity-90 hover:opacity-100" href="#">Terms of Service</a>
+<a class="text-slate-500 hover:text-cyan-800 dark:hover:text-cyan-200 underline underline-offset-4 transition-opacity opacity-90 hover:opacity-100" href="#">Privacy Policy</a>
+<a class="text-slate-500 hover:text-cyan-800 dark:hover:text-cyan-200 underline underline-offset-4 transition-opacity opacity-90 hover:opacity-100" href="#">Contact</a>
+</div>
+</div>
+</footer>
+<!-- BottomNavBar (Mobile Only) -->
+<div class="md:hidden fixed bottom-0 left-0 right-0 glass-header flex justify-around items-center py-3 px-6 z-50">
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="text-[10px] font-bold">Explore</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="text-[10px] font-medium">History</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined" data-icon="bookmark">bookmark</span>
+<span class="text-[10px] font-medium">Saved</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-medium">Account</span>
+</div>
+</div>
+</body></html>

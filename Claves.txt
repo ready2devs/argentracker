@@ -1,0 +1,23 @@
+---
+Suppabase usuario por mail: argentracker1@gmail.com Pass:@Mateo2018: 
+Organización: ArgenTracker, Nombre Proyecto: ArgenTracker, Pass:@mateoyluciano
+
+Project URL (NEXT_PUBLIC_SUPABASE_URL):https://xouieloovcertveumuyb.supabase.co
+
+Publishable API key DEFAULT: sb_publishable_Uc5GUwweCHQmyoxb6oVvmQ_pqKjN1-6
+
+Anon public KEY:    
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvdWllbG9vdmNlcnR2ZXVtdXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDc4MDksImV4cCI6MjA5MTc4MzgwOX0.oCovMd3yCmUREQHDt6tk3LUnIjG9pYiorOr_ZLp5EJk
+
+SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvdWllbG9vdmNlcnR2ZXVtdXliIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjIwNzgwOSwiZXhwIjoyMDkxNzgzODA5fQ.9-rExOIlsRfTj7LO0PfgFCbur5mP1pnxq0mJfGSv35c
+---
+
+---
+API MERCADOLIBRE
+Nombre : ArgenTracker. Client ID: 3531144650908300. Client Secret: FLFd4FLdvrNl4eMsSX2ETUqTBsYEsixN
+
+---
+
+---
+projects/870111544470 GEMINI aistudio.google.com GEMINI_API_KEY_1: AIzaSyDFLllLUismgB1w2pJ-eFTTFPpZgpi3lCM 
+---
