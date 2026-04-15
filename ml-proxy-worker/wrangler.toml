@@ -1,0 +1,8 @@
+name = "ml-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+workers_dev = true
+
+# Workers free plan: 100,000 requests/day
+# URL: https://ml-proxy.argentracker1.workers.dev/search?q=...
+

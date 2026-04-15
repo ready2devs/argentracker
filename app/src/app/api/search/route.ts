@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { orchestrateSearch } from "@/lib/agents/orchestrator";
+import { getMLToken } from "@/lib/mercadolibre/token-manager";
 
 // ================================================
-// POST /api/search — Punto de entrada principal.
-// En dev usa mock data. En prod (Vercel) llama ML.
+// POST /api/search
+// Lee el token ML del cookie httpOnly y lo pasa al orchestrator.
 // ================================================
 
 export async function POST(request: NextRequest) {
@@ -18,6 +19,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Leer token de usuario ML desde cookie httpOnly
+    const { token: mlAccessToken, userId, isAuthenticated } = await getMLToken();
+
+    console.log("[/api/search] query:", query.trim(), "| authenticated:", isAuthenticated);
+
     const result = await orchestrateSearch({
       query: query.trim(),
       inputType,
@@ -25,6 +31,8 @@ export async function POST(request: NextRequest) {
       brand,
       model,
       category,
+      userId: userId || undefined,
+      mlAccessToken: mlAccessToken || undefined,
     });
 
     return NextResponse.json({ success: true, data: result });

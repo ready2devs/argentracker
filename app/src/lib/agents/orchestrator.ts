@@ -4,10 +4,6 @@ import { rankResults, calcAvgPrice } from "@/lib/agents/price-ranker";
 import { dbManager } from "@/lib/agents/database-manager";
 import type { RankedResult } from "@/types";
 
-// ================================================
-// Orchestrator — Coordina el flujo de búsqueda
-// ================================================
-
 export interface SearchInput {
   query: string;
   inputType: "url" | "screenshot";
@@ -17,6 +13,7 @@ export interface SearchInput {
   category?: string;
   userId?: string;
   skipCache?: boolean;
+  mlAccessToken?: string; // Token de usuario autenticado con ML OAuth
 }
 
 export interface SearchOutput {
@@ -35,7 +32,7 @@ export interface SearchOutput {
 export async function orchestrateSearch(input: SearchInput): Promise<SearchOutput> {
   const start = Date.now();
 
-  // 1. Verificar caché
+  // 1. Verificar caché (siempre)
   if (!input.skipCache) {
     const cached = await dbManager.getCached(input.query);
     if (cached?.length) {
@@ -43,35 +40,43 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
       const bestUsed = cached.find((r) => r.is_best_used) || null;
       const avgPrice = Math.round(cached.reduce((a, b) => a + b.price, 0) / cached.length);
       return {
-        searchId: null,
-        productName: input.query,
-        results: cached,
-        bestNew,
-        bestUsed,
-        avgPrice,
-        totalResults: cached.length,
-        fromCache: true,
-        isMock: false,
-        durationMs: Date.now() - start,
+        searchId: null, productName: input.query, results: cached,
+        bestNew, bestUsed, avgPrice, totalResults: cached.length,
+        fromCache: true, isMock: false, durationMs: Date.now() - start,
       };
     }
   }
 
   let allItems;
   let isMock = false;
+  const hasUserToken = !!input.mlAccessToken;
 
-  if (IS_MOCK_MODE) {
-    console.log("[Orchestrator] 🧪 Dev mock mode");
+  if (IS_MOCK_MODE && !hasUserToken) {
+    // Dev sin token → mock
+    console.log("[Orchestrator] 🧪 Dev mock mode (no ML token)");
     isMock = true;
     allItems = generateMockResults(input.query);
-  } else {
-    // Producción: intentar ML real, fallback a mock si falla
+  } else if (hasUserToken) {
+    // Prod/Dev CON token → ML real 🎯
     try {
-      const { new: newItems, used: usedItems } = await mlConnector.searchBothConditions(input.query);
+      console.log("[Orchestrator] 🔐 Using authenticated ML token");
+      const { new: newItems, used: usedItems } =
+        await mlConnector.searchBothConditions(input.query, input.mlAccessToken!);
       allItems = [...newItems, ...usedItems];
-      if (!allItems.length) throw new Error("No results from ML");
+      if (!allItems.length) throw new Error("No results");
     } catch (err) {
-      console.warn("[Orchestrator] ML failed, using mock:", String(err).slice(0, 100));
+      console.warn("[Orchestrator] ML with token failed, falling back to mock:", String(err).slice(0, 80));
+      isMock = true;
+      allItems = generateMockResults(input.query);
+    }
+  } else {
+    // Prod sin token → intentar ML, fallback mock
+    try {
+      const { new: newItems, used: usedItems } =
+        await mlConnector.searchBothConditions(input.query, "");
+      allItems = [...newItems, ...usedItems];
+      if (!allItems.length) throw new Error("No results");
+    } catch {
       isMock = true;
       allItems = generateMockResults(input.query);
     }
@@ -90,28 +95,22 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
   const bestNew = ranked.find((r) => r.is_best_new) || null;
   const bestUsed = ranked.find((r) => r.is_best_used) || null;
 
-  // Guardar en caché solo si no es mock
+  // Guardar en caché solo datos reales
   if (!isMock) {
     Promise.allSettled([
       dbManager.saveCache(input.query, ranked),
       dbManager.saveSearch({
-        productName: input.query,
-        brand: input.brand,
-        model: input.model,
-        category: input.category,
-        inputType: input.inputType,
-        inputValue: input.inputValue,
-        results: ranked,
-        avgPrice,
-        userId: input.userId,
+        productName: input.query, brand: input.brand,
+        model: input.model, category: input.category,
+        inputType: input.inputType, inputValue: input.inputValue,
+        results: ranked, avgPrice, userId: input.userId,
       }),
     ]).catch(console.error);
   }
 
   return {
-    searchId: null, productName: input.query,
-    results: ranked, bestNew, bestUsed, avgPrice,
-    totalResults: ranked.length, fromCache: false, isMock,
-    durationMs: Date.now() - start,
+    searchId: null, productName: input.query, results: ranked,
+    bestNew, bestUsed, avgPrice, totalResults: ranked.length,
+    fromCache: false, isMock, durationMs: Date.now() - start,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TopNavBar from "@/components/layout/TopNavBar";
 import BottomNavBar from "@/components/layout/BottomNavBar";
@@ -9,6 +9,11 @@ import SearchInput from "@/components/search/SearchInput";
 import ScreenshotUpload from "@/components/search/ScreenshotUpload";
 
 type SearchStep = "idle" | "searching" | "done" | "error";
+
+interface MLAuthStatus {
+  isAuthenticated: boolean;
+  userId: string | null;
+}
 
 const STEP_LABELS: Record<string, string> = {
   idle: "",
@@ -22,7 +27,23 @@ export default function LandingPage() {
   const [step, setStep] = useState<SearchStep>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [progress, setProgress] = useState(0);
+  const [mlAuth, setMlAuth] = useState<MLAuthStatus | null>(null);
   const isLoading = step === "searching" || step === "done";
+
+  // Verificar auth status al cargar
+  useEffect(() => {
+    fetch("/api/auth/ml/status")
+      .then((r) => r.json())
+      .then(setMlAuth)
+      .catch(() => setMlAuth({ isAuthenticated: false, userId: null }));
+
+    // Si viene de un auth redirect, limpiar params de la URL
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("ml_auth")) {
+      url.searchParams.delete("ml_auth");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   const handleSearch = async (
     query: string,
@@ -87,6 +108,40 @@ export default function LandingPage() {
               </p>
 
               <div className="space-y-4">
+                {/* ML Auth Banner */}
+                {mlAuth !== null && (
+                  <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium ${
+                    mlAuth.isAuthenticated
+                      ? "bg-tertiary-fixed/20 text-primary border border-tertiary-fixed/30"
+                      : "bg-surface-container border border-outline-variant"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`material-symbols-outlined text-lg ${
+                        mlAuth.isAuthenticated ? "text-tertiary-fixed-dim" : "text-outline"
+                      }`}>
+                        {mlAuth.isAuthenticated ? "verified" : "link"}
+                      </span>
+                      <span className={mlAuth.isAuthenticated ? "text-primary" : "text-on-surface-variant"}>
+                        {mlAuth.isAuthenticated
+                          ? `✅ Conectado a Mercado Libre — búsqueda en tiempo real`
+                          : "Conectá tu cuenta de ML para ver precios reales"}
+                      </span>
+                    </div>
+                    {mlAuth.isAuthenticated ? (
+                      <a href="/api/auth/ml/logout"
+                        className="text-xs text-outline hover:text-error transition-colors whitespace-nowrap">
+                        Desconectar
+                      </a>
+                    ) : (
+                      <a href="/api/auth/ml/login" id="btn-ml-connect"
+                        className="flex items-center gap-1 px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-smooth whitespace-nowrap">
+                        <span className="material-symbols-outlined text-sm">login</span>
+                        Conectar ML
+                      </a>
+                    )}
+                  </div>
+                )}
+
                 <SearchInput onSearch={handleUrlSearch} isLoading={isLoading} />
                 <ScreenshotUpload onUpload={handleScreenshotUpload} isLoading={isLoading} />
 
