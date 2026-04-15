@@ -58,11 +58,17 @@
 
 ## ⚠️ Issues Conocidos
 
-### 1. Gemini Vision — Modelo y Rate Limits
+### 1. 🚨 API Keys REVOCADAS por Google
+- Google detectó las keys en el repo público y las revocó automáticamente
+- Error: `403 PERMISSION_DENIED — API key was reported as leaked`
+- **Acción**: Generar 3 keys nuevas en [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- **Actualizar**: `.env.local` + Vercel Environment Variables
+- **Regla**: NUNCA más poner keys en archivos que van a git
+
+### 2. Gemini Vision — Modelo y Rate Limits
 - **Modelo final**: `gemini-2.5-flash-lite` (stable, alto RPM, soporta imágenes)
-- El preview `-04-17` fue SHUT DOWN por Google — siempre usar el stable sin fecha
-- Las 3 keys se saturaron hoy por testing intensivo — en uso normal no se saturan
-- **Mañana**: probar con quotas reseteadas, debería funcionar de primera
+- El preview `-04-17` fue SHUT DOWN por Google — usar el stable sin fecha
+- `gemini-2.0-flash` también funciona como fallback
 
 ### 2. ML OAuth → App en modo "test"
 - **Causa**: ML requiere certificación para producción
@@ -73,11 +79,13 @@
 
 ## 🔜 Próximos Pasos — Mañana
 
-1. **Verificar Vision** con quotas reseteadas (subir captura → debería detectar producto)
-2. **Agregar más API keys** de Gemini para más capacidad
-3. **ML Certificación**: Completar el formulario de seguridad en ML Developers
-4. **Supabase cache**: Guardar resultados de búsqueda para evitar re-fetch
-5. **ML API real**: Conectar búsquedas reales una vez resuelto el OAuth
+1. **🚨 Generar 3 API keys nuevas** en AI Studio (las actuales fueron revocadas)
+2. **Actualizar `.env.local`** y **Vercel** con las keys nuevas
+3. **Probar Vision** con las keys nuevas
+4. **Agregar más API keys** de otras cuentas si se quiere más capacidad
+5. **ML Certificación**: Completar el formulario de seguridad en ML Developers
+6. **Supabase cache**: Guardar resultados de búsqueda para evitar re-fetch
+7. **ML API real**: Conectar búsquedas reales una vez resuelto el OAuth
 
 ---
 
