@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ================================================
 // POST /api/vision
 // Recibe una imagen (base64) y extrae el nombre del producto
-// usando Gemini 2.5 Flash (visión multimodal).
+// usando Gemini 2.0 Flash via native fetch (v1 API — soporta Gemini 2.x).
 // ================================================
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const genAI = GEMINI_KEY ? new GoogleGenerativeAI(GEMINI_KEY) : null;
+// Usamos v1 directamente — el SDK @google/generative-ai está atado a v1beta
+// que no soporta modelos Gemini 2.x.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `Sos un experto en identificar productos electrónicos y artículos de consumo.
 Tu tarea: analizar la imagen y extraer el nombre exacto del producto para buscar en Mercado Libre Argentina.
@@ -24,12 +26,19 @@ Formato de respuesta (JSON puro, sin markdown):
   "productName": "nombre del producto para buscar",
   "brand": "marca si es identificable",
   "model": "modelo exacto si es identificable",
-  "price": 12345 o null,
-  "confidence": 0.0 a 1.0
+  "price": 12345,
+  "confidence": 0.95
 }`;
 
 export async function POST(request: NextRequest) {
   try {
+    if (!GEMINI_KEY) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY no configurada. Agregala en Vercel → Settings → Environment Variables." },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { imageBase64, mimeType = "image/jpeg" } = body;
 
@@ -37,33 +46,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "imageBase64 requerido" }, { status: 400 });
     }
 
-    if (!genAI) {
+    const payload = {
+      contents: [
+        {
+          parts: [
+            { text: SYSTEM_PROMPT },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 512,
+        responseMimeType: "application/json",
+      },
+    };
+
+    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[/api/vision] Gemini error:", res.status, errText);
       return NextResponse.json(
-        { error: "GEMINI_API_KEY no configurada. Agregala en Vercel → Settings → Environment Variables." },
-        { status: 503 }
+        { error: `Error Gemini API ${res.status}: ${errText.slice(0, 200)}` },
+        { status: 502 }
       );
     }
 
-    const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
-      generationConfig: {
-        temperature: 0.1,        // Baja temperatura para respuestas precisas
-        maxOutputTokens: 256,
-        responseMimeType: "application/json",
-      },
-    });
+    const geminiResponse = await res.json();
+    const raw = geminiResponse?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    const result = await model.generateContent([
-      { text: SYSTEM_PROMPT },
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType,
-        },
-      },
-    ]);
-
-    const raw = result.response.text().trim();
+    if (!raw) {
+      return NextResponse.json(
+        { error: "Gemini no devolvió contenido." },
+        { status: 422 }
+      );
+    }
 
     let parsed: {
       productName: string | null;
@@ -76,7 +103,6 @@ export async function POST(request: NextRequest) {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Intentar extraer JSON si hay texto extra
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error("Gemini no devolvió JSON válido");
       parsed = JSON.parse(match[0]);
