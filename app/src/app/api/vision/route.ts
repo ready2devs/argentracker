@@ -7,7 +7,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // usando Gemini 2.5 Flash (visión multimodal).
 // ================================================
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const genAI = GEMINI_KEY ? new GoogleGenerativeAI(GEMINI_KEY) : null;
 
 const SYSTEM_PROMPT = `Sos un experto en identificar productos electrónicos y artículos de consumo.
 Tu tarea: analizar la imagen y extraer el nombre exacto del producto para buscar en Mercado Libre Argentina.
@@ -36,8 +37,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "imageBase64 requerido" }, { status: 400 });
     }
 
+    if (!genAI) {
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY no configurada. Agregala en Vercel → Settings → Environment Variables." },
+        { status: 503 }
+      );
+    }
+
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17",
       generationConfig: {
         temperature: 0.1,        // Baja temperatura para respuestas precisas
         maxOutputTokens: 256,
