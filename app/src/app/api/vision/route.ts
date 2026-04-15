@@ -13,7 +13,7 @@ const GEMINI_KEYS = [
   process.env.GEMINI_API_KEY_3,
 ].filter(Boolean) as string[];
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-04-17";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite-preview-04-17";
 const GEMINI_BASE = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `Sos un experto en identificar productos electrónicos y artículos de consumo.
