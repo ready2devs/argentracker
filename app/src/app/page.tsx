@@ -118,45 +118,11 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm bg-error-container text-on-error-container">
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-base">error</span>
-                      <span>No se pudo conectar con ML. Probá con otra cuenta de MercadoLibre.</span>
+                      <span>No se pudo conectar con ML. Intentá de nuevo más tarde.</span>
                     </div>
                     <button onClick={() => setMlAuthError(false)}>
                       <span className="material-symbols-outlined text-base">close</span>
                     </button>
-                  </div>
-                )}
-
-                {/* ML Auth Banner */}
-                {mlAuth !== null && (
-                  <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium ${
-                    mlAuth.isAuthenticated
-                      ? "bg-tertiary-fixed/20 text-primary border border-tertiary-fixed/30"
-                      : "bg-surface-container border border-outline-variant"
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`material-symbols-outlined text-lg ${
-                        mlAuth.isAuthenticated ? "text-tertiary-fixed-dim" : "text-outline"
-                      }`}>
-                        {mlAuth.isAuthenticated ? "verified" : "link"}
-                      </span>
-                      <span className={mlAuth.isAuthenticated ? "text-primary" : "text-on-surface-variant"}>
-                        {mlAuth.isAuthenticated
-                          ? `✅ Conectado a Mercado Libre — búsqueda en tiempo real`
-                          : "Conectá tu cuenta de ML para ver precios reales"}
-                      </span>
-                    </div>
-                    {mlAuth.isAuthenticated ? (
-                      <a href="/api/auth/ml/logout"
-                        className="text-xs text-outline hover:text-error transition-colors whitespace-nowrap">
-                        Desconectar
-                      </a>
-                    ) : (
-                      <a href="/api/auth/ml/login" id="btn-ml-connect"
-                        className="flex items-center gap-1 px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:opacity-90 transition-smooth whitespace-nowrap">
-                        <span className="material-symbols-outlined text-sm">login</span>
-                        Conectar ML
-                      </a>
-                    )}
                   </div>
                 )}
 

@@ -1,15 +1,15 @@
 import type { MLItem } from "@/types";
 
 // ================================================
-// Mock Data para desarrollo local
-// ML bloquea requests sin cookies de sesión desde IPs externas.
+// Mock Data — precios calibrados con el mercado real de ML AR
+// Links apuntan a búsquedas reales filtradas por condición + precio asc.
 // ================================================
 
 const MOCK_ITEMS: Partial<MLItem>[] = [
   {
     id: "MLA1001",
     title: "Apple iPhone 15 Pro 256GB Titanio Natural - Sellado",
-    price: 2290000,
+    price: 1850000,
     currency_id: "ARS",
     condition: "new",
     thumbnail: null,
@@ -20,8 +20,8 @@ const MOCK_ITEMS: Partial<MLItem>[] = [
   },
   {
     id: "MLA1002",
-    title: "iPhone 15 Pro 256 GB Black Titanium Nuevo - Tienda Oficial",
-    price: 2450000,
+    title: "iPhone 15 Pro 256 GB Black Titanium - Tienda Oficial Apple",
+    price: 2100000,
     currency_id: "ARS",
     condition: "new",
     thumbnail: null,
@@ -32,8 +32,8 @@ const MOCK_ITEMS: Partial<MLItem>[] = [
   },
   {
     id: "MLA1003",
-    title: "iPhone 15 Pro 128GB Como Nuevo - Solo 2 meses de uso",
-    price: 1680000,
+    title: "iPhone 15 Pro 128GB Como Nuevo - 2 meses de uso",
+    price: 1120000,
     currency_id: "ARS",
     condition: "used",
     thumbnail: null,
@@ -44,8 +44,8 @@ const MOCK_ITEMS: Partial<MLItem>[] = [
   },
   {
     id: "MLA1004",
-    title: "iPhone 15 Pro 256GB - En perfecto estado con accesorios",
-    price: 1890000,
+    title: "iPhone 15 Pro 256GB - Perfecto estado con accesorios",
+    price: 1380000,
     currency_id: "ARS",
     condition: "used",
     thumbnail: null,
@@ -56,8 +56,8 @@ const MOCK_ITEMS: Partial<MLItem>[] = [
   },
   {
     id: "MLA1005",
-    title: "iPhone 15 Pro Max 512GB Natural Titanium - Importado",
-    price: 3100000,
+    title: "iPhone 15 Pro Max 512GB Natural Titanium - Importado FULL",
+    price: 2450000,
     currency_id: "ARS",
     condition: "new",
     thumbnail: null,
@@ -68,8 +68,8 @@ const MOCK_ITEMS: Partial<MLItem>[] = [
   },
   {
     id: "MLA1006",
-    title: "iPhone 15 Pro 256 Negro Titanio - Caja Abierta / Demo",
-    price: 2100000,
+    title: "iPhone 15 Pro 256 Negro Titanio - Caja Abierta / Exhibición",
+    price: 1650000,
     currency_id: "ARS",
     condition: "new",
     thumbnail: null,
@@ -80,19 +80,21 @@ const MOCK_ITEMS: Partial<MLItem>[] = [
   },
 ];
 
-// Genera resultados mock adaptados al query.
-// Los permalinks apuntan a búsquedas REALES en ML — siempre funcionan.
-export function generateMockResults(query: string): MLItem[] {
+// Links filtrados por condición y ordenados por precio ascendente en ML
+function mlLink(query: string, condition: "new" | "used"): string {
   const slug = query.trim().replace(/\s+/g, "-").toLowerCase();
-  const mlSearchNew = `https://listado.mercadolibre.com.ar/${slug}`;
-  const mlSearchUsed = `https://listado.mercadolibre.com.ar/${slug}_Condicion-Usado`;
+  const condSuffix = condition === "new" ? "_Nuevo" : "_Usado";
+  return `https://listado.mercadolibre.com.ar/${slug}${condSuffix}#D_SORD=price`;
+}
 
+export function generateMockResults(query: string): MLItem[] {
   return MOCK_ITEMS.map((item, i) => ({
     ...item,
     id: `MOCK_${i}`,
     title: item.title!.replace(/iphone 15 pro/gi, query),
-    permalink: item.condition === "used" ? mlSearchUsed : mlSearchNew,
-    price: Math.round((item.price! * (0.9 + Math.random() * 0.2)) / 1000) * 1000,
+    permalink: mlLink(query, item.condition as "new" | "used"),
+    // Variación leve del precio para parecer más natural
+    price: Math.round((item.price! * (0.95 + Math.random() * 0.1)) / 1000) * 1000,
   })) as MLItem[];
 }
 
