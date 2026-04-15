@@ -7,7 +7,7 @@ interface ScreenshotUploadProps {
   isLoading?: boolean;
 }
 
-type UploadState = "idle" | "analyzing" | "done" | "error";
+type UploadState = "idle" | "analyzing" | "done" | "error" | "retrying";
 
 export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -15,6 +15,9 @@ export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUplo
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [extractedProduct, setExtractedProduct] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const retryFileRef = useRef<File | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const analyzeWithGemini = useCallback(
@@ -42,6 +45,25 @@ export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUplo
         });
 
         const json = await res.json();
+
+        if (res.status === 429) {
+          // Auto-retry en 30 segundos con countdown
+          retryFileRef.current = file;
+          setUploadState("retrying");
+          setCountdown(30);
+          countdownRef.current = setInterval(() => {
+            setCountdown((c) => {
+              if (c <= 1) {
+                clearInterval(countdownRef.current!);
+                const f = retryFileRef.current;
+                if (f) analyzeWithGemini(f);
+                return 0;
+              }
+              return c - 1;
+            });
+          }, 1000);
+          return;
+        }
 
         if (!res.ok || json.error) {
           throw new Error(json.error || "No se pudo identificar el producto.");
@@ -94,6 +116,7 @@ export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUplo
     analyzing: "progress_activity",
     done: "check_circle",
     error: "error",
+    retrying: "schedule",
   }[uploadState];
 
   const stateColor = {
@@ -101,6 +124,7 @@ export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUplo
     analyzing: "text-primary animate-spin",
     done: "text-tertiary-fixed-dim",
     error: "text-error",
+    retrying: "text-warning",
   }[uploadState];
 
   const borderClass = {
@@ -110,6 +134,7 @@ export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUplo
     analyzing: "border-primary/50 bg-primary-fixed/5",
     done: "border-tertiary-fixed-dim/50 bg-tertiary/5",
     error: "border-error/40 bg-error-container/30",
+    retrying: "border-warning/40 bg-warning/5",
   }[uploadState];
 
   return (
@@ -164,6 +189,14 @@ export default function ScreenshotUpload({ onSearch, isLoading }: ScreenshotUplo
             <p className="text-on-surface font-medium">Producto detectado:</p>
             <p className="text-sm font-bold text-primary mt-1">{extractedProduct}</p>
             <p className="text-xs text-outline mt-1">Haz clic para subir otra imagen</p>
+          </>
+        )}
+
+        {uploadState === "retrying" && (
+          <>
+            <p className="text-on-surface font-medium">Quota temporalmente agotada</p>
+            <p className="text-sm font-bold text-primary mt-1">Reintentando en {countdown}s…</p>
+            <p className="text-xs text-outline mt-1">La imagen se enviará automáticamente</p>
           </>
         )}
 
