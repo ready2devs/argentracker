@@ -61,18 +61,19 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
   let isMock = false;
 
   if (IS_MOCK_MODE) {
-    // Modo desarrollo: usar datos mock
-    console.log("[Orchestrator] 🧪 Using mock data (ML API not available from server)");
+    console.log("[Orchestrator] 🧪 Dev mock mode");
     isMock = true;
     allItems = generateMockResults(input.query);
   } else {
-    // Producción: llamar a ML API (funciona en Vercel)
+    // Producción: intentar ML real, fallback a mock si falla
     try {
       const { new: newItems, used: usedItems } = await mlConnector.searchBothConditions(input.query);
       allItems = [...newItems, ...usedItems];
+      if (!allItems.length) throw new Error("No results from ML");
     } catch (err) {
-      console.error("[Orchestrator] ML search failed:", err);
-      throw new Error("No se pudo conectar con MercadoLibre. Intentá de nuevo.");
+      console.warn("[Orchestrator] ML failed, using mock:", String(err).slice(0, 100));
+      isMock = true;
+      allItems = generateMockResults(input.query);
     }
   }
 
