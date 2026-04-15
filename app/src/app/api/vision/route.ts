@@ -6,11 +6,15 @@ import { NextRequest, NextResponse } from "next/server";
 // usando Gemini 2.0 Flash via native fetch (v1 API — soporta Gemini 2.x).
 // ================================================
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-// Usamos v1 directamente — el SDK @google/generative-ai está atado a v1beta
-// que no soporta modelos Gemini 2.x.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
+// Rotación automática: si una key da 429, prueba la siguiente
+const GEMINI_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+].filter(Boolean) as string[];
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+const GEMINI_BASE = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `Sos un experto en identificar productos electrónicos y artículos de consumo.
 Tu tarea: analizar la imagen y extraer el nombre exacto del producto para buscar en Mercado Libre Argentina.
@@ -32,7 +36,7 @@ Formato de respuesta (JSON puro, sin markdown):
 
 export async function POST(request: NextRequest) {
   try {
-    if (!GEMINI_KEY) {
+    if (GEMINI_KEYS.length === 0) {
       return NextResponse.json(
         { error: "GEMINI_API_KEY no configurada. Agregala en Vercel → Settings → Environment Variables." },
         { status: 503 }
@@ -51,37 +55,42 @@ export async function POST(request: NextRequest) {
         {
           parts: [
             { text: SYSTEM_PROMPT },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: imageBase64,
-              },
-            },
+            { inline_data: { mime_type: mimeType, data: imageBase64 } },
           ],
         },
       ],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 512,
-      },
+      generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
     };
 
-    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[/api/vision] Gemini error:", res.status, errText);
-      return NextResponse.json(
-        { error: `Error Gemini API ${res.status}: ${errText.slice(0, 200)}` },
-        { status: 502 }
-      );
+    // Rotación: prueba cada key hasta obtener respuesta no-429
+    let geminiResponse: { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null = null;
+    for (const key of GEMINI_KEYS) {
+      const res = await fetch(`${GEMINI_BASE}?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 429) {
+        continue; // prueba la siguiente key
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("[/api/vision] Gemini error:", res.status, errText);
+        return NextResponse.json(
+          { error: `Error Gemini API ${res.status}: ${errText.slice(0, 200)}` },
+          { status: 502 }
+        );
+      }
+      geminiResponse = await res.json();
+      break;
     }
 
-    const geminiResponse = await res.json();
+    if (!geminiResponse) {
+      return NextResponse.json(
+        { error: "Todas las keys de Gemini están en quota límite. Intentá en unos segundos." },
+        { status: 429 }
+      );
+    }
     const raw = geminiResponse?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
     if (!raw) {
