@@ -13,6 +13,7 @@ type SearchStep = "idle" | "searching" | "done" | "error";
 interface MLAuthStatus {
   isAuthenticated: boolean;
   userId: string | null;
+  source?: string;
 }
 
 const STEP_LABELS: Record<string, string> = {
@@ -156,6 +157,26 @@ export default function LandingPage() {
                           style={{ width: `${progress}%` }}
                         />
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ML Connection Status */}
+                {mlAuth && (
+                  <div className="flex items-center gap-2 text-xs">
+                    {mlAuth.isAuthenticated ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-tertiary-fixed/20 text-tertiary-fixed-dim font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-tertiary-fixed animate-pulse-soft" />
+                        Datos reales de ML activos
+                      </span>
+                    ) : (
+                      <a
+                        href="/api/auth/ml/login"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant font-medium hover:bg-primary-fixed/20 hover:text-primary transition-smooth"
+                      >
+                        <span className="material-symbols-outlined text-sm">link</span>
+                        Conectar con Mercado Libre para datos reales
+                      </a>
                     )}
                   </div>
                 )}

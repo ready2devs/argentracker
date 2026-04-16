@@ -18,6 +18,7 @@ interface SearchOutput {
   fromCache: boolean;
   isMock: boolean;
   durationMs: number;
+  authSource?: string;
 }
 
 function formatPrice(price: number) {
@@ -136,19 +137,26 @@ function ResultsContent() {
 
   return (
     <>
-      {/* Mock data banner */}
-      {data.isMock && (
-        <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-secondary-container text-on-secondary-container text-sm font-medium rounded-xl">
-          <span className="material-symbols-outlined text-base">science</span>
-          <span>Mostrando datos de muestra — la integración con ML está en configuración.</span>
+      {/* Data source banner */}
+      {data.isMock ? (
+        <div className="mb-4 flex items-center justify-between gap-2 px-4 py-3 bg-secondary-container text-on-secondary-container text-sm font-medium rounded-xl">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">science</span>
+            <span>Datos de muestra — <a href="/api/auth/ml/login" className="underline font-bold">conectá con ML</a> para precios reales.</span>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed/20 text-tertiary-fixed-dim text-xs font-bold rounded-full">
+          <span className="w-2 h-2 rounded-full bg-tertiary-fixed" />
+          Datos reales de Mercado Libre · {data.durationMs}ms
         </div>
       )}
 
       {/* Cache badge */}
       {data.fromCache && !data.isMock && (
-        <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full">
+        <div className="mb-4 ml-2 inline-flex items-center gap-2 px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full">
           <span className="material-symbols-outlined text-sm">cached</span>
-          Resultado en caché · {data.durationMs}ms
+          Caché · {data.durationMs}ms
         </div>
       )}
 

@@ -1,9 +1,9 @@
 # 🛰️ Argentracker — Session State
 
 ## 📅 Sesión Actual
-- **Fecha**: 2026-04-15 04:19 (ART)
-- **Fase**: ✅ FASE 2 COMPLETADA → Listo para Fase 3
-- **Estado**: Frontend + Gemini Vision + Mock data funcionando en Vercel.
+- **Fecha**: 2026-04-16 01:38 (ART)
+- **Fase**: 🔧 FASE 3 EN PROGRESO — Motor de búsqueda real
+- **Estado**: Backend refactorizado, deploy en Vercel, esperando OAuth ML
 
 ---
 
@@ -19,53 +19,66 @@
 - [x] `/api/search` — Motor de búsqueda con mock data
 - [x] `/api/rank` — Rankeador de precios
 - [x] `/api/vision` — Gemini Vision (identifica productos desde captura de pantalla)
-  - Modelo: `gemini-2.5-flash-lite` (stable ID, v1 API, alto RPM)
-  - Fallback: `gemini-2.0-flash` también funciona
-  - Rotación automática de 3 API keys en caso de 429
+  - Modelo: `gemini-2.5-flash-lite` (alto RPM)
+  - Rotación automática de **5 API keys** (GEMINI_API_KEY a GEMINI_API_KEY_5)
   - Auto-retry con countdown de 30s en el frontend
-- [x] ML OAuth flow (`/api/auth/ml/*`) — implementado pero bloqueado (app en modo test)
+- [x] ML OAuth flow (`/api/auth/ml/*`) — implementado
 - [x] Mock data calibrada con precios reales ARS
-- [x] Links "Ir a la oferta" → búsquedas en ML filtradas por condición + precio
+
+### Fase 3 — Motor de Búsqueda Real (EN PROGRESO)
+- [x] **Descubrimiento clave**: ML Search API requiere user-level OAuth (403 sin token)
+- [x] `client_credentials` app token funciona solo para `/users/me`, NO para search
+- [x] Nuevo `token-manager.ts` con 3 estrategias: cookie → server → app
+- [x] Tabla `ml_server_tokens` creada en Supabase (almacena token de servidor)
+- [x] OAuth callback guarda token en cookies Y en Supabase para reutilización server-side
+- [x] `api.ts` reescrito con User-Agent rotation [Ref 15] + delays [Ref 16]
+- [x] Orchestrator refactorizado para resolver tokens automáticamente
+- [x] Build pasa ✅ + deployed a Vercel
+- [x] Bug fix: `ML_CLIENT_SECRET` variable duplicada en `.env.local`
+- [ ] **PENDIENTE**: Autorizar ML OAuth (login del app owner)
+- [ ] **PENDIENTE**: Verificar búsqueda real con datos de ML
+- [ ] **PENDIENTE**: Verificar que links apuntan a publicaciones reales (permalinks)
+- [ ] **PENDIENTE**: Thumbnails reales de ML en resultados
 
 ### ✅ Verificado en producción
 - Gemini Vision detectó correctamente "Celular iPhone 15 Pro 128 GB" desde una captura
-- Resultados se muestran con precio promedio, mejor nuevo, mejor usado
-- UI responsive y funcional en argentracker.vercel.app
+- Status endpoint funciona: `argentracker.vercel.app/api/auth/ml/status` → `{"isAuthenticated":false,"source":"none"}`
 
 ---
 
 ## ⚠️ Issues Conocidos
 
-### 1. API Keys — Regeneradas
-- Las keys originales fueron revocadas por Google (detectadas en historial git público)
-- ✅ Ya se generaron 3 keys nuevas y se cargaron en `.env.local` + Vercel
+### 1. ML OAuth → Requiere autorización manual del owner
+- La API de búsqueda de ML ahora requiere token de usuario
+- El `client_credentials` token (app-level) NO sirve para `/sites/MLA/search`
+- **Solución implementada**: El owner autoriza una vez vía OAuth, el token se guarda en Supabase y se auto-refresca
+- **URL de autorización**: `https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=3531144650908300&redirect_uri=https://argentracker.vercel.app/api/auth/ml/callback`
+
+### 2. API Keys — Seguras
+- Las keys están solo en `.env.local` (gitignored) y Vercel env vars
+- **5 Gemini keys** para rotación: `GEMINI_API_KEY` a `GEMINI_API_KEY_5`
 - **Regla**: NUNCA poner API keys en archivos que van a git
 
-### 2. Links "Ir a la oferta" → Listado genérico de ML
-- Actualmente los links llevan a una búsqueda general en ML (incluye fundas, accesorios, etc.)
-- **Causa**: Son URLs de búsqueda del mock data, no links directos a publicaciones
-- **Fix**: Fase 3 — conectar ML API real para obtener links directos al producto más barato
-
-### 3. ML OAuth → App en modo "test"
-- ML requiere certificación para producción
-- Workaround actual: Mock data funcional
+### 3. Gemini Keys 4 y 5 — Formato diferente
+- Keys 1-3: prefijo `AIza...` (Google AI Studio)
+- Keys 4-5: prefijo `AQ.Ab8RN6...` (formato diferente, verificar si funcionan)
+- Si dan error, pueden necesitar ser de Google AI Studio
 
 ---
 
-## 🔜 Próximos Pasos — Fase 3 (Motor de Búsqueda Real)
+## 🔜 Pasos Inmediatos
 
-1. **Conectar ML API real** — Reemplazar mock data con búsquedas reales en ML
-   - Usar API pública de ML (no requiere OAuth para búsqueda)
-   - Obtener links directos a publicaciones (no búsquedas genéricas)
-   - Filtrar por categoría para excluir fundas/accesorios
-2. **Normalización de resultados** — Agrupar publicaciones del mismo producto exacto
-3. **Imágenes reales** — Mostrar thumbnails de los productos desde ML
-4. **Supabase cache** — Guardar resultados para evitar re-fetch
-5. **ML Certificación** — Solicitar modo producción para OAuth
+1. **Autorizar ML OAuth** — Login en la URL de autorización
+2. **Verificar búsqueda real** — Probar con "iPhone 15 Pro" en argentracker.vercel.app
+3. **Validar resultados** — Confirmar que:
+   - Precios son reales y actuales
+   - Links "Ir a la oferta" van a la publicación real de ML (no búsqueda genérica)
+   - Thumbnails de productos se muestran
+4. **Actualizar frontend** — Mostrar estado de autenticación ML y si los datos son reales/mock
 
 ---
 
 ## 📊 Progreso General
 ```
-[▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░] 60% — Fase 1+2 completadas, mock data + Vision funcionando
+[▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░] 75% — Fase 3 en progreso, backend listo para datos reales
 ```
