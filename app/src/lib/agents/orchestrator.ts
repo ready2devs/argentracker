@@ -1,4 +1,4 @@
-import { mlConnector } from "@/lib/mercadolibre/api";
+import { searchViaProducts } from "@/lib/mercadolibre/product-search";
 import { scrapeMLBothConditions } from "@/lib/mercadolibre/scraper";
 import { generateMockResults } from "@/lib/mercadolibre/mock-data";
 import { rankResults, calcAvgPrice } from "@/lib/agents/price-ranker";
@@ -11,8 +11,8 @@ import type { RankedResult } from "@/types";
 //
 // Strategy priority:
 // 1. Cache (if valid)
-// 2. ML API with OAuth token (if available and works)
-// 3. ML Web Scraper (public website — always works)
+// 2. ML Product Catalog API (works with our token!)
+// 3. ML Web Scraper (fallback, works from non-blocked IPs)
 // 4. Mock data (last resort)
 // ================================================
 
@@ -85,10 +85,11 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
     authSource = tokenResult.source;
   }
 
+  // 2. Try ML Product Catalog API (primary — works with our token)
   if (accessToken) {
     try {
-      console.log("[Orchestrator] 🔍 Trying ML API with token (source:", authSource, ")");
-      const { new: newItems, used: usedItems } = await mlConnector.searchBothConditions(
+      console.log("[Orchestrator] 🔍 Trying ML Product Catalog API (source:", authSource, ")");
+      const { new: newItems, used: usedItems } = await searchViaProducts(
         input.query,
         accessToken
       );
@@ -97,21 +98,21 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
       if (allItems.length > 0) {
         dataSource = "api";
         console.log(
-          `[Orchestrator] ✅ ML API: ${newItems.length} new + ${usedItems.length} used`
+          `[Orchestrator] ✅ Products API: ${newItems.length} new + ${usedItems.length} used`
         );
       } else {
-        throw new Error("No results from ML API");
+        throw new Error("No results from Products API");
       }
     } catch (err) {
-      console.warn("[Orchestrator] ML API failed:", String(err).slice(0, 120));
-      allItems = null; // Will try scraper next
+      console.warn("[Orchestrator] Products API failed:", String(err).slice(0, 120));
+      allItems = null;
     }
   }
 
-  // 3. Fallback: ML Web Scraper (always works)
+  // 3. Fallback: ML Web Scraper (works from non-blocked IPs)
   if (!allItems || allItems.length === 0) {
     try {
-      console.log("[Orchestrator] 🌐 ML API unavailable, trying web scraper...");
+      console.log("[Orchestrator] 🌐 Trying web scraper...");
       const { new: newItems, used: usedItems } = await scrapeMLBothConditions(input.query);
       allItems = [...newItems, ...usedItems];
 
@@ -125,13 +126,12 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
       }
     } catch (err) {
       console.warn("[Orchestrator] Scraper failed:", String(err).slice(0, 120));
-      // Will fall through to mock
     }
   }
 
   // 4. Last resort: Mock data
   if (!allItems || allItems.length === 0) {
-    console.log("[Orchestrator] 🧪 Using mock data (API + scraper failed)");
+    console.log("[Orchestrator] 🧪 Using mock data (all sources failed)");
     isMock = true;
     dataSource = "mock";
     allItems = generateMockResults(input.query);
