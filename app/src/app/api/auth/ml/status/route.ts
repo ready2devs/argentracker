@@ -1,8 +1,31 @@
 import { NextResponse } from "next/server";
-import { getMLToken } from "@/lib/mercadolibre/token-manager";
+import { getUserToken, getServerToken } from "@/lib/mercadolibre/token-manager";
 
-// GET /api/auth/ml/status — Devuelve si el usuario está autenticado con ML
+// GET /api/auth/ml/status — Returns ML authentication status
 export async function GET() {
-  const { isAuthenticated, userId } = await getMLToken();
-  return NextResponse.json({ isAuthenticated, userId });
+  // Check user-level cookie
+  const userToken = await getUserToken();
+  if (userToken.isAuthenticated) {
+    return NextResponse.json({
+      isAuthenticated: true,
+      userId: userToken.userId,
+      source: "user_oauth",
+    });
+  }
+
+  // Check server-level token
+  const serverToken = await getServerToken();
+  if (serverToken.isAuthenticated) {
+    return NextResponse.json({
+      isAuthenticated: true,
+      userId: serverToken.userId,
+      source: "server_token",
+    });
+  }
+
+  return NextResponse.json({
+    isAuthenticated: false,
+    userId: null,
+    source: "none",
+  });
 }

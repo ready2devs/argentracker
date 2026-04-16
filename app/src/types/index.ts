@@ -43,6 +43,7 @@ export interface MLSearchOptions {
   sort?: "price_asc" | "price_desc" | "relevance";
   limit?: number;
   offset?: number;
+  categoryId?: string;
 }
 
 export interface MLItem {

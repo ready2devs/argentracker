@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 // ================================================
 // POST /api/vision
 // Recibe una imagen (base64) y extrae el nombre del producto
-// usando Gemini 2.0 Flash via native fetch (v1 API — soporta Gemini 2.x).
+// usando Gemini 2.5 Flash Lite via native fetch (v1 API).
+// Rotación automática de 5 API keys en caso de 429.
 // ================================================
 
 // Rotación automática: si una key da 429, prueba la siguiente
@@ -11,8 +12,11 @@ const GEMINI_KEYS = [
   process.env.GEMINI_API_KEY,
   process.env.GEMINI_API_KEY_2,
   process.env.GEMINI_API_KEY_3,
+  process.env.GEMINI_API_KEY_4,
+  process.env.GEMINI_API_KEY_5,
 ].filter(Boolean) as string[];
 
+// Siempre gemini-2.5-flash-lite para mayor RPM
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_BASE = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
@@ -64,13 +68,18 @@ export async function POST(request: NextRequest) {
 
     // Rotación: prueba cada key hasta obtener respuesta no-429
     let geminiResponse: { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null = null;
-    for (const key of GEMINI_KEYS) {
+    let usedKeyIndex = -1;
+
+    for (let i = 0; i < GEMINI_KEYS.length; i++) {
+      const key = GEMINI_KEYS[i];
       const res = await fetch(`${GEMINI_BASE}?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       if (res.status === 429) {
+        console.warn(`[/api/vision] Key ${i + 1}/${GEMINI_KEYS.length} rate-limited, trying next...`);
         continue; // prueba la siguiente key
       }
       if (!res.ok) {
@@ -82,6 +91,7 @@ export async function POST(request: NextRequest) {
         );
       }
       geminiResponse = await res.json();
+      usedKeyIndex = i;
       break;
     }
 
@@ -91,6 +101,9 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
+
+    console.log(`[/api/vision] ✅ Used Gemini key ${usedKeyIndex + 1}/${GEMINI_KEYS.length}`);
+
     const raw = geminiResponse?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
     if (!raw) {

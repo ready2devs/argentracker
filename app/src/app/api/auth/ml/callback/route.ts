@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { saveServerToken } from "@/lib/mercadolibre/token-manager";
 
 // ================================================
 // GET /api/auth/ml/callback
 // ML redirige acá con ?code=... tras el login del usuario.
 // Intercambia el code por access_token + refresh_token.
+// Guarda en cookies (sesión de usuario) Y en Supabase
+// (token de servidor para búsquedas de todos los usuarios).
 // ================================================
 
 const CLIENT_ID = process.env.ML_CLIENT_ID!;
@@ -27,7 +30,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/?ml_auth=error", request.url));
   }
 
-  // Intercambiar code → access_token
+  // Exchange code → access_token
   let tokenData: {
     access_token: string;
     refresh_token: string;
@@ -61,22 +64,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/?ml_auth=error", request.url));
   }
 
-  // Guardar tokens en cookies httpOnly
+  // Save as server-level token in Supabase (for all users to benefit)
+  try {
+    await saveServerToken(tokenData);
+    console.log("[ML OAuth] ✅ Server token saved to Supabase");
+  } catch (err) {
+    console.warn("[ML OAuth] Failed to save server token:", err);
+    // Non-blocking — cookies will still work for this user
+  }
+
+  // Save tokens in httpOnly cookies (for this user session)
   const response = NextResponse.redirect(new URL("/?ml_auth=success", request.url));
 
-  // Access token (expira según ML, normalmente 6 horas)
+  // Access token (expires per ML, normally 6 hours)
   response.cookies.set("ml_access_token", tokenData.access_token, {
     ...COOKIE_OPTS,
-    maxAge: tokenData.expires_in - 60, // margen de 1 minuto
+    maxAge: tokenData.expires_in - 60, // 1-minute margin
   });
 
-  // Refresh token (larga duración)
+  // Refresh token (long-lived)
   response.cookies.set("ml_refresh_token", tokenData.refresh_token, {
     ...COOKIE_OPTS,
-    maxAge: 60 * 60 * 24 * 30, // 30 días
+    maxAge: 60 * 60 * 24 * 30, // 30 days
   });
 
-  // User ID para identificar al usuario
+  // User ID
   response.cookies.set("ml_user_id", String(tokenData.user_id), {
     ...COOKIE_OPTS,
     maxAge: 60 * 60 * 24 * 30,

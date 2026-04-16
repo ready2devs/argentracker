@@ -103,6 +103,20 @@ CREATE TABLE IF NOT EXISTS price_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_snapshots_product ON price_snapshots(saved_product_id, captured_at DESC);
 
+-- 6. ML_SERVER_TOKENS (server-side ML OAuth token storage)
+-- Stores the app owner's ML token for server-side API access
+-- Only one "primary" row — upserted on each OAuth callback
+CREATE TABLE IF NOT EXISTS ml_server_tokens (
+    id TEXT PRIMARY KEY DEFAULT 'primary',
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    user_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+
 -- =============================================
 -- ROW LEVEL SECURITY
 -- =============================================
@@ -112,6 +126,7 @@ ALTER TABLE search_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE saved_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ml_server_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Búsquedas anónimas (sin user_id) son públicas, las del usuario son propias
 CREATE POLICY "searches_select" ON searches FOR SELECT

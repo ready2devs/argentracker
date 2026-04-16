@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { orchestrateSearch } from "@/lib/agents/orchestrator";
-import { getMLToken } from "@/lib/mercadolibre/token-manager";
 
 // ================================================
 // POST /api/search
-// Lee el token ML del cookie httpOnly y lo pasa al orchestrator.
+// Unified search endpoint. The orchestrator handles
+// ML token resolution internally (cookie → server → app).
 // ================================================
 
 export async function POST(request: NextRequest) {
@@ -19,10 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Leer token de usuario ML desde cookie httpOnly
-    const { token: mlAccessToken, userId, isAuthenticated } = await getMLToken();
-
-    console.log("[/api/search] query:", query.trim(), "| authenticated:", isAuthenticated);
+    console.log("[/api/search] query:", query.trim());
 
     const result = await orchestrateSearch({
       query: query.trim(),
@@ -31,8 +28,6 @@ export async function POST(request: NextRequest) {
       brand,
       model,
       category,
-      userId: userId || undefined,
-      mlAccessToken: mlAccessToken || undefined,
     });
 
     return NextResponse.json({ success: true, data: result });
