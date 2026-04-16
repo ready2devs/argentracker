@@ -142,13 +142,16 @@ export async function searchViaProducts(
     if (!itemsResult?.results?.length) continue;
 
     const thumbnail = detail?.pictures?.[0]?.secure_url || detail?.pictures?.[0]?.url || null;
-    const productPermalink = detail?.permalink || null;
 
     for (const item of itemsResult.results) {
       if (item.price <= 0) continue;
 
-      const permalink = productPermalink ||
-        `https://www.mercadolibre.com.ar/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}/p/${product.id}`;
+      // IMPORTANT: Link to the specific ITEM page, not the product catalog.
+      // Product catalog (/p/MLA...) shows ML's "buy-box winner" which may
+      // be a DIFFERENT seller at a DIFFERENT price. The direct item URL
+      // (articulo.mercadolibre.com.ar/MLA-XXXX) goes to the exact listing.
+      const itemIdNumbers = item.item_id.replace(/^MLA/, "");
+      const permalink = `https://articulo.mercadolibre.com.ar/MLA-${itemIdNumbers}`;
 
       const itemCondition = (item.condition === "used" ? "used" : "new") as "new" | "used";
 
