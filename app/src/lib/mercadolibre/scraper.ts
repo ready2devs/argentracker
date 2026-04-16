@@ -1,14 +1,15 @@
 import type { MLItem } from "@/types";
 
 // ================================================
-// ML Web Scraper — Extracts real product data from ML's
-// public website when the API is blocked (app in test mode).
+// ML Web Scraper — Extracts real product data from
+// ML's embedded polycard JSON in search HTML.
 //
-// Strategy: fetch ML search HTML, parse poly-card elements
-// to extract direct product permalinks, prices, thumbnails.
+// ML renders React components with embedded JSON:
+// { "polycard": { "metadata": { "id": "MLA...", "url": "..." },
+//   "components": [{ "type": "title", "title": { "text": "..." }},
+//                  { "type": "price", "price": { "current_price": { "value": 1234 }}}]}}
 //
-// [Ref 15] User-Agent rotation
-// [Ref 16] Human delays
+// [Ref 15] User-Agent rotation  [Ref 16] Human delays
 // ================================================
 
 const USER_AGENTS = [
@@ -26,7 +27,6 @@ function humanDelay(min = 500, max = 1500): Promise<void> {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min) + min)));
 }
 
-// Build ML search URL sorted by price ascending
 function buildSearchUrl(query: string, condition?: "new" | "used"): string {
   const slug = query.trim().replace(/\s+/g, "-");
   let url = `https://listado.mercadolibre.com.ar/${encodeURIComponent(slug)}`;
@@ -36,99 +36,100 @@ function buildSearchUrl(query: string, condition?: "new" | "used"): string {
   return url;
 }
 
-// Parse price string "1.200.000" → 1200000
-function parsePrice(priceStr: string): number {
-  const cleaned = priceStr.replace(/[^0-9.,]/g, "").replace(/\./g, "").replace(",", ".");
-  return parseFloat(cleaned) || 0;
+// Unescape \u002F → / and other Unicode escapes
+function unescapeUrl(raw: string): string {
+  try {
+    return JSON.parse(`"${raw}"`);
+  } catch {
+    return raw.replace(/\\u002F/g, "/");
+  }
 }
 
-// Extract items from ML search HTML using section-based splitting
-function parseMLSearchHTML(html: string, condition: "new" | "used"): MLItem[] {
+// Parse polycard JSON blocks from ML search HTML
+function parsePolycards(html: string, condition: "new" | "used"): MLItem[] {
   const items: MLItem[] = [];
+  const seen = new Set<string>();
 
-  // Split by product link anchors — each product has an <a> with href to mercadolibre.com.ar
-  // We look for <a> tags with product links, then extract data around them
-  const productLinkRegex = /href="(https:\/\/(?:www\.)?mercadolibre\.com\.ar\/[^"]*(?:\/p\/MLA|MLA-|\/MLA|\?)[^"]*)"[^>]*>/g;
-  const positions: { url: string; pos: number }[] = [];
+  // Find all polycard metadata blocks  
+  // Pattern: "polycard":{"unique_id":"...","metadata":{"id":"MLA...","url":"..."...},"components":[...]}
+  const polycardRegex = /"polycard":\{"unique_id":"[^"]+","metadata":\{"id":"(MLA\d+)","product_id":"(MLA\w+)","user_product_id":"[^"]*","url":"([^"]+)"/g;
 
   let match;
-  while ((match = productLinkRegex.exec(html)) !== null) {
-    const url = match[1].split("#")[0]; // Remove fragment
-    // Skip duplicate URLs and non-product URLs
-    if (url.includes("/noindex") || url.includes("policy")) continue;
-    // De-dupe
-    if (positions.some((p) => p.url === url)) continue;
-    positions.push({ url, pos: match.index });
-  }
+  while ((match = polycardRegex.exec(html)) !== null) {
+    const itemId = match[1];
+    const productId = match[2];
+    const rawUrl = match[3];
 
-  // For each product link, extract a context window (4000 chars around it)
-  for (let i = 0; i < Math.min(positions.length, 50); i++) {
-    const { url, pos } = positions[i];
-    const start = Math.max(0, pos - 2000);
-    const end = Math.min(html.length, pos + 2000);
-    const context = html.substring(start, end);
+    // De-duplicate by item ID
+    if (seen.has(itemId)) continue;
+    seen.add(itemId);
 
-    // Extract title from the context
-    const titleMatch =
-      context.match(/poly-component__title[^>]*>([^<]+)/) ||
-      context.match(/ui-search-item__title[^>]*>([^<]+)/) ||
-      context.match(/title="([^"]+)".*?MLA/);
+    // Build full permalink
+    const permalink = `https://${unescapeUrl(rawUrl)}`;
+
+    // Scan forward from this position for title + price in the components array
+    const forward = html.substring(match.index, Math.min(html.length, match.index + 3000));
+
+    // Title
+    const titleMatch = forward.match(/"type":"title"[^}]*"text":"([^"]+)"/);
+    const title = titleMatch ? unescapeUrl(titleMatch[1]) : "";
+
+    // Price (current_price value)
+    const priceMatch = forward.match(/"current_price":\{"value":(\d+)/);
+    const price = priceMatch ? parseInt(priceMatch[1]) : 0;
+
+    // Thumbnail — try pic_id, pic_url, or construct from item ID
+    const picMatch = 
+      forward.match(/"pic_id":"([^"]+)"/) ||
+      forward.match(/"pic_url":"([^"]+)"/) ||
+      forward.match(/"pictures?":\[?\{"id":"([^"]+)"/);
     
-    // Extract price
-    const priceMatch = context.match(/andes-money-amount__fraction"[^>]*>([0-9.]+)</);
-
-    // Extract thumbnail
-    const thumbMatch =
-      context.match(/(?:data-src|src)="(https:\/\/http2\.mlstatic\.com\/D_[^"]+)"/) ||
-      context.match(/(?:data-src|src)="(https:\/\/[^"]*mlstatic\.com\/[^"]+\.(?:jpg|webp|png)[^"]*)"/);
-
-    // Extract seller name
-    const sellerMatch =
-      context.match(/poly-component__seller[^>]*>([^<]+)/) ||
-      context.match(/ui-search-official-store-label[^>]*>([^<]+)/);
-
-    // Free shipping detection
-    const hasFreeShip = /envío gratis|free.shipping/i.test(context);
-
-    const price = priceMatch ? parsePrice(priceMatch[1]) : 0;
-    const title = titleMatch ? titleMatch[1].trim() : "";
-
-    // Only add if we have both title and price and they look real
-    if (price > 10000 && title.length > 5) {
-      items.push({
-        id: `SCRAPE_${condition}_${i}`,
-        title,
-        price,
-        currency_id: "ARS",
-        condition,
-        permalink: url,
-        thumbnail: thumbMatch ? thumbMatch[1] : null,
-        seller: {
-          nickname: sellerMatch ? sellerMatch[1].trim() : "Vendedor ML",
-          reputation: null,
-        },
-        shipping: { free_shipping: hasFreeShip },
-        address: null,
-        installments: null,
-        tags: [],
-      });
+    let thumbnail: string | null = null;
+    if (picMatch) {
+      const picId = picMatch[1];
+      if (picId.startsWith("http")) {
+        thumbnail = picId;
+      } else {
+        thumbnail = `https://http2.mlstatic.com/D_${picId}-O.jpg`;
+      }
     }
+    // Fallback: try to find data-src img in the HTML near the product link
+    if (!thumbnail) {
+      const imgMatch = forward.match(/data-src="(https:\/\/http2\.mlstatic\.com\/D_[^"]+)"/);
+      if (imgMatch) thumbnail = imgMatch[1];
+    }
+
+    // Shipping
+    const freeShipMatch = forward.match(/"free_shipping":true/);
+    const hasFreeShip = !!freeShipMatch || /gratis/i.test(forward.substring(0, 1500));
+
+    // Skip items without title or price, and accessories (price < 100k)
+    if (!title || price < 100000) continue;
+
+    items.push({
+      id: itemId,
+      title,
+      price,
+      currency_id: "ARS",
+      condition,
+      permalink,
+      thumbnail,
+      seller: {
+        nickname: "Vendedor ML",
+        reputation: null,
+      },
+      shipping: { free_shipping: hasFreeShip },
+      address: null,
+      installments: null,
+      tags: [],
+    });
   }
 
-  // De-duplicate by permalink (some items appear in multiple card formats)
-  const unique = new Map<string, MLItem>();
-  for (const item of items) {
-    if (!unique.has(item.permalink)) {
-      unique.set(item.permalink, item);
-    }
-  }
-
-  const result = Array.from(unique.values());
-  console.log(`[MLScraper] Parsed ${result.length} unique items from HTML (${condition})`);
-  return result;
+  console.log(`[MLScraper] Parsed ${items.length} polycards (${condition})`);
+  return items;
 }
 
-// Main scraper function
+// Main scraper
 export async function scrapeMLSearch(
   query: string,
   condition: "new" | "used"
@@ -151,20 +152,20 @@ export async function scrapeMLSearch(
     });
 
     if (!res.ok) {
-      console.error(`[MLScraper] HTTP ${res.status} from ${url}`);
+      console.error(`[MLScraper] HTTP ${res.status}`);
       return [];
     }
 
     const html = await res.text();
     console.log(`[MLScraper] Received ${html.length} bytes`);
-    return parseMLSearchHTML(html, condition);
+    return parsePolycards(html, condition);
   } catch (err) {
-    console.error("[MLScraper] Fetch error:", String(err).slice(0, 150));
+    console.error("[MLScraper] Error:", String(err).slice(0, 150));
     return [];
   }
 }
 
-// Search both conditions in parallel
+// Search both conditions
 export async function scrapeMLBothConditions(
   query: string
 ): Promise<{ new: MLItem[]; used: MLItem[] }> {
