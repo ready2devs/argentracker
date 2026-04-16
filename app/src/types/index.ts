@@ -106,9 +106,18 @@ export interface RankedResult {
   is_ad: boolean;
   is_best_new: boolean;
   is_best_used: boolean;
+  is_international: boolean;
   normalized_model: string;
   score: number;
+  score_breakdown?: {
+    price_score: number;
+    reputation_score: number;
+    shipping_score: number;
+    installments_score: number;
+  };
   installments_text?: string;
+  base_price?: number;        // original price before taxes (for international)
+  estimated_taxes?: number;   // estimated import taxes (for international)
 }
 
 // -----------------------------------

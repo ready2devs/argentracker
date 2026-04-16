@@ -75,6 +75,20 @@ export function rankResults(items: MLItem[]): RankedResult[] {
         installmentsScore * WEIGHTS.installments) /
       100;
 
+    // Detect international items from tags
+    const tags = item.tags || [];
+    const isIntl = tags.includes("_argentracker_international");
+
+    // Extract base price and taxes for international items
+    let basePrice: number | undefined;
+    let estimatedTaxes: number | undefined;
+    if (isIntl) {
+      const basePriceTag = tags.find((t) => t.startsWith("_argentracker_base_price_"));
+      const taxTag = tags.find((t) => t.startsWith("_argentracker_estimated_taxes_"));
+      if (basePriceTag) basePrice = parseInt(basePriceTag.replace("_argentracker_base_price_", ""));
+      if (taxTag) estimatedTaxes = parseInt(taxTag.replace("_argentracker_estimated_taxes_", ""));
+    }
+
     const result: RankedResult = {
       ml_item_id: item.id,
       title: item.title,
@@ -89,13 +103,22 @@ export function rankResults(items: MLItem[]): RankedResult[] {
         : "Argentina",
       permalink: item.permalink,
       thumbnail: item.thumbnail || "",
-      rank_position: 0, // se asigna después de ordenar
+      rank_position: 0,
       is_ad: false,
       is_best_new: false,
       is_best_used: false,
+      is_international: isIntl,
       normalized_model: normalizeTitle(item.title),
       score: Math.round(totalScore * 10) / 10,
+      score_breakdown: {
+        price_score: Math.round(priceScore * 10) / 10,
+        reputation_score: reputationScore,
+        shipping_score: shippingScore,
+        installments_score: installmentsScore,
+      },
       installments_text: formatInstallments(item),
+      base_price: basePrice,
+      estimated_taxes: estimatedTaxes,
     };
 
     return result;

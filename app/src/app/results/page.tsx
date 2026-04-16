@@ -305,7 +305,7 @@ function ResultsContent() {
                 Otras opciones recomendadas
               </h3>
               <p className="text-on-surface-variant text-sm mt-1">
-                {otherResults.length} alternativas · Ordenadas por score real
+                {otherResults.length} alternativas · Ordenadas por score (precio 50% + reputación 25% + envío 15% + cuotas 10%)
               </p>
             </div>
           </div>
@@ -347,22 +347,34 @@ function ResultsContent() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-start md:items-center w-1/2 md:w-1/5">
+                <div className="flex flex-col items-start md:items-center w-1/4 md:w-auto">
                   <span className="text-xs text-on-surface-variant mb-1">Condición</span>
-                  <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full ${
-                      result.condition === "used"
-                        ? "bg-secondary-container text-on-secondary-container"
-                        : "bg-surface-container text-on-surface"
-                    }`}
-                  >
-                    {result.condition === "new" ? "NUEVO" : "USADO"}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`px-3 py-1 text-xs font-bold rounded-full ${
+                        result.condition === "used"
+                          ? "bg-secondary-container text-on-secondary-container"
+                          : "bg-surface-container text-on-surface"
+                      }`}
+                    >
+                      {result.condition === "new" ? "NUEVO" : "USADO"}
+                    </span>
+                    {result.is_international && (
+                      <span className="px-2 py-1 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800">
+                        🌍 INTL
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex flex-col items-start md:items-center w-1/2 md:w-1/5">
+                <div className="flex flex-col items-start md:items-center w-1/4 md:w-auto">
                   <span className="text-xs text-on-surface-variant mb-1">Reputación</span>
                   <ReputationBar level={result.seller_reputation} />
+                </div>
+
+                <div className="flex flex-col items-start md:items-center w-1/6 md:w-auto" title={result.score_breakdown ? `Precio: ${result.score_breakdown.price_score} | Rep: ${result.score_breakdown.reputation_score} | Envío: ${result.score_breakdown.shipping_score} | Cuotas: ${result.score_breakdown.installments_score}` : undefined}>
+                  <span className="text-xs text-on-surface-variant mb-1">Score</span>
+                  <span className="text-xs font-bold text-primary">{result.score}</span>
                 </div>
 
                 <div className="flex flex-col items-end w-full md:w-1/5">
@@ -375,6 +387,11 @@ function ResultsContent() {
                   >
                     {formatPrice(result.price)}
                   </span>
+                  {result.is_international && result.base_price && result.estimated_taxes && (
+                    <span className="text-[10px] text-amber-700">
+                      Base {formatPrice(result.base_price)} + imp. {formatPrice(result.estimated_taxes)}
+                    </span>
+                  )}
                   {result.installments_text && (
                     <span className="text-[10px] font-bold text-on-surface-variant">
                       {result.installments_text}
