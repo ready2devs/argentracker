@@ -24,7 +24,7 @@ function randomUA(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
 
-function humanDelay(min = 300, max = 800): Promise<void> {
+function humanDelay(min = 100, max = 300): Promise<void> {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min) + min)));
 }
 
@@ -114,36 +114,39 @@ export async function searchViaProducts(
   const newItems: MLItem[] = [];
   const usedItems: MLItem[] = [];
 
-  // Step 2: For each product, get items (sellers/prices) and product details
-  // Limit to top 5 products to avoid too many API calls
+  // Step 2: Fetch items + details for top 5 products IN PARALLEL
   const products = searchResult.results.slice(0, 5);
 
-  for (const product of products) {
-    await humanDelay();
+  await humanDelay();
 
-    // Get items (sellers + prices) for this product
-    const itemsResult = await mlFetch<MLProductItemsResult>(
-      `/products/${product.id}/items?status=active&limit=20`,
-      accessToken
-    );
+  const productDataPromises = products.map(async (product) => {
+    const [itemsResult, detail] = await Promise.all([
+      mlFetch<MLProductItemsResult>(
+        `/products/${product.id}/items?status=active&limit=20`,
+        accessToken
+      ),
+      mlFetch<MLProductDetail>(
+        `/products/${product.id}`,
+        accessToken
+      ),
+    ]);
+    return { product, itemsResult, detail };
+  });
+
+  const productDataResults = await Promise.allSettled(productDataPromises);
+
+  for (const result of productDataResults) {
+    if (result.status !== "fulfilled") continue;
+    const { product, itemsResult, detail } = result.value;
 
     if (!itemsResult?.results?.length) continue;
-
-    // Get product details (pictures)
-    const detail = await mlFetch<MLProductDetail>(
-      `/products/${product.id}`,
-      accessToken
-    );
 
     const thumbnail = detail?.pictures?.[0]?.secure_url || detail?.pictures?.[0]?.url || null;
     const productPermalink = detail?.permalink || null;
 
-    // Build ML items from the sellers
     for (const item of itemsResult.results) {
-      // Skip very high prices (likely errors or premium listings)
       if (item.price <= 0) continue;
 
-      // Build permalink from product detail or construct it
       const permalink = productPermalink ||
         `https://www.mercadolibre.com.ar/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}/p/${product.id}`;
 
