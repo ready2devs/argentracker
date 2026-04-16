@@ -1,4 +1,5 @@
 import { mlConnector } from "@/lib/mercadolibre/api";
+import { scrapeMLBothConditions } from "@/lib/mercadolibre/scraper";
 import { generateMockResults } from "@/lib/mercadolibre/mock-data";
 import { rankResults, calcAvgPrice } from "@/lib/agents/price-ranker";
 import { dbManager } from "@/lib/agents/database-manager";
@@ -8,12 +9,11 @@ import type { RankedResult } from "@/types";
 // ================================================
 // Orchestrator — Coordinates the search pipeline
 //
-// Flow:
-// 1. Check cache
-// 2. Get ML token (user cookie → server → app)
-// 3. Search ML API (real) or fall back to mock
-// 4. Rank results
-// 5. Save to cache + history
+// Strategy priority:
+// 1. Cache (if valid)
+// 2. ML API with OAuth token (if available and works)
+// 3. ML Web Scraper (public website — always works)
+// 4. Mock data (last resort)
 // ================================================
 
 export interface SearchInput {
@@ -25,7 +25,6 @@ export interface SearchInput {
   category?: string;
   userId?: string;
   skipCache?: boolean;
-  // If the caller already has a token, pass it directly
   mlAccessToken?: string;
 }
 
@@ -39,6 +38,7 @@ export interface SearchOutput {
   totalResults: number;
   fromCache: boolean;
   isMock: boolean;
+  dataSource: "api" | "scraper" | "mock" | "cache";
   durationMs: number;
   authSource: string;
 }
@@ -46,7 +46,7 @@ export interface SearchOutput {
 export async function orchestrateSearch(input: SearchInput): Promise<SearchOutput> {
   const start = Date.now();
 
-  // 1. Check cache (always, unless skipped)
+  // 1. Check cache
   if (!input.skipCache) {
     const cached = await dbManager.getCached(input.query);
     if (cached?.length) {
@@ -63,13 +63,19 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
         totalResults: cached.length,
         fromCache: true,
         isMock: false,
+        dataSource: "cache",
         durationMs: Date.now() - start,
         authSource: "cache",
       };
     }
   }
 
-  // 2. Resolve ML token
+  // 2. Try ML API with token
+  let allItems;
+  let isMock = false;
+  let dataSource: "api" | "scraper" | "mock" = "mock";
+
+  // Resolve token
   let accessToken = input.mlAccessToken || null;
   let authSource = "provided";
 
@@ -77,46 +83,57 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
     const tokenResult = await getMLToken();
     accessToken = tokenResult.token;
     authSource = tokenResult.source;
-    console.log("[Orchestrator] Token source:", tokenResult.source, "| authenticated:", tokenResult.isAuthenticated);
   }
-
-  // 3. Search ML API
-  let allItems;
-  let isMock = false;
 
   if (accessToken) {
     try {
-      console.log("[Orchestrator] 🔍 Searching ML with token (source:", authSource, ")");
+      console.log("[Orchestrator] 🔍 Trying ML API with token (source:", authSource, ")");
       const { new: newItems, used: usedItems } = await mlConnector.searchBothConditions(
         input.query,
         accessToken
       );
       allItems = [...newItems, ...usedItems];
 
-      if (!allItems.length) {
-        console.warn("[Orchestrator] ML returned 0 results, falling back to mock");
+      if (allItems.length > 0) {
+        dataSource = "api";
+        console.log(
+          `[Orchestrator] ✅ ML API: ${newItems.length} new + ${usedItems.length} used`
+        );
+      } else {
         throw new Error("No results from ML API");
       }
-
-      console.log(
-        `[Orchestrator] ✅ ML real data: ${newItems.length} new + ${usedItems.length} used = ${allItems.length} total`
-      );
     } catch (err) {
-      const errMsg = String(err);
-      console.warn("[Orchestrator] ML search failed:", errMsg.slice(0, 120));
-
-      // If auth error, log it clearly
-      if (errMsg.includes("ML_AUTH_ERROR")) {
-        console.error("[Orchestrator] ⚠️ ML token is invalid/expired. Falling back to mock.");
-      }
-
-      isMock = true;
-      allItems = generateMockResults(input.query);
+      console.warn("[Orchestrator] ML API failed:", String(err).slice(0, 120));
+      allItems = null; // Will try scraper next
     }
-  } else {
-    // No token at all → mock
-    console.log("[Orchestrator] 🧪 No ML token available, using mock data");
+  }
+
+  // 3. Fallback: ML Web Scraper (always works)
+  if (!allItems || allItems.length === 0) {
+    try {
+      console.log("[Orchestrator] 🌐 ML API unavailable, trying web scraper...");
+      const { new: newItems, used: usedItems } = await scrapeMLBothConditions(input.query);
+      allItems = [...newItems, ...usedItems];
+
+      if (allItems.length > 0) {
+        dataSource = "scraper";
+        console.log(
+          `[Orchestrator] ✅ Scraper: ${newItems.length} new + ${usedItems.length} used`
+        );
+      } else {
+        throw new Error("Scraper returned 0 results");
+      }
+    } catch (err) {
+      console.warn("[Orchestrator] Scraper failed:", String(err).slice(0, 120));
+      // Will fall through to mock
+    }
+  }
+
+  // 4. Last resort: Mock data
+  if (!allItems || allItems.length === 0) {
+    console.log("[Orchestrator] 🧪 Using mock data (API + scraper failed)");
     isMock = true;
+    dataSource = "mock";
     allItems = generateMockResults(input.query);
   }
 
@@ -130,19 +147,20 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
       avgPrice: 0,
       totalResults: 0,
       fromCache: false,
-      isMock,
+      isMock: true,
+      dataSource: "mock",
       durationMs: Date.now() - start,
       authSource,
     };
   }
 
-  // 4. Rank results
+  // 5. Rank results
   const ranked = rankResults(allItems);
   const avgPrice = calcAvgPrice(allItems);
   const bestNew = ranked.find((r) => r.is_best_new) || null;
   const bestUsed = ranked.find((r) => r.is_best_used) || null;
 
-  // 5. Save to cache + history (only for real data, fire-and-forget)
+  // 6. Cache real data
   if (!isMock) {
     Promise.allSettled([
       dbManager.saveCache(input.query, ranked),
@@ -170,6 +188,7 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
     totalResults: ranked.length,
     fromCache: false,
     isMock,
+    dataSource,
     durationMs: Date.now() - start,
     authSource,
   };

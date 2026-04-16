@@ -19,6 +19,7 @@ interface SearchOutput {
   isMock: boolean;
   durationMs: number;
   authSource?: string;
+  dataSource?: "api" | "scraper" | "mock" | "cache";
 }
 
 function formatPrice(price: number) {
@@ -142,13 +143,13 @@ function ResultsContent() {
         <div className="mb-4 flex items-center justify-between gap-2 px-4 py-3 bg-secondary-container text-on-secondary-container text-sm font-medium rounded-xl">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-base">science</span>
-            <span>Datos de muestra — <a href="/api/auth/ml/login" className="underline font-bold">conectá con ML</a> para precios reales.</span>
+            <span>Datos de muestra — los precios y links son aproximados.</span>
           </div>
         </div>
       ) : (
         <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed/20 text-tertiary-fixed-dim text-xs font-bold rounded-full">
           <span className="w-2 h-2 rounded-full bg-tertiary-fixed" />
-          Datos reales de Mercado Libre · {data.durationMs}ms
+          {data.dataSource === "scraper" ? "Precios reales de ML" : data.dataSource === "api" ? "ML API en vivo" : "Datos reales"} · {data.durationMs}ms
         </div>
       )}
 
