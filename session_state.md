@@ -1,9 +1,9 @@
 # 🛰️ Argentracker — Session State
 
 ## 📅 Última Sesión
-- **Fecha**: 2026-04-16 04:40 (ART)
-- **Fase**: ✅ FASE 3 COMPLETADA — Datos reales de MercadoLibre
-- **Estado**: Producción con datos reales. Pendientes menores para fase 4.
+- **Fecha**: 2026-04-17 01:29 (ART)
+- **Fase**: ✅ FASE 3 COMPLETADA — Datos reales de MercadoLibre + validación de modelos
+- **Estado**: Producción estable. Todos los issues críticos resueltos.
 
 ---
 
@@ -21,102 +21,83 @@
 - [x] `/api/vision` — Gemini Vision (identifica productos desde capturas)
   - Modelo: `gemini-2.5-flash-lite` (alto RPM)
   - Rotación automática de **5 API keys** (GEMINI_API_KEY a GEMINI_API_KEY_5)
+  - Keys 4 y 5 verificadas funcionales (formato `AQ.Ab8...`, dan 429 no 401)
   - Auto-retry con countdown de 30s en el frontend
-- [x] ML OAuth flow (`/api/auth/ml/*`) — implementado
-- [x] Mock data calibrada con precios reales ARS
 
 ### Fase 3 — Motor de Búsqueda Real ✅ COMPLETADA
-- [x] **Descubrimiento clave**: ML Search API (`/sites/MLA/search`) retorna 403 para apps en test mode
-- [x] **ML website captcha**: Bloquea IPs de Vercel y Cloudflare Workers
-- [x] **SOLUCIÓN**: ML Products Catalog API funciona con nuestro token:
-  - `/products/search?q=...` → IDs de productos del catálogo
+- [x] **ML Products Catalog API** como fuente principal:
+  - `/products/search?q=...` → IDs de productos
   - `/products/{id}/items` → sellers + precios REALES
-  - `/products/{id}` → imágenes/thumbnails del producto
-  - `/users?ids=...` → nombres + reputación de vendedores (batch)
-- [x] `product-search.ts` — Connector Products API v3 con:
-  - Fetch paralelo (Promise.allSettled) para caber en timeout de 10s de Vercel
-  - Detección de items internacionales (tags `cbt_item`, `cbt_fulfillment`)
-  - Precio total para internacionales = base + 35% impuestos estimados
-  - Batch fetch de sellers via `/users?ids=` multi-get
-  - Mapeo de reputación ML (5_green, power_seller platinum/gold)
+  - `/products/{id}` → imágenes/thumbnails
+  - `/users?ids=...` → nombres + reputación (batch multi-get)
 - [x] **Links directos al vendedor**: `articulo.mercadolibre.com.ar/MLA-{item_id}`
-  - Antes: `/p/MLA...` (catálogo) → mostraba buy-box winner a OTRO precio
-  - Ahora: Item específico del vendedor al precio exacto mostrado
-- [x] **Orchestrator**: Products API → Scraper → Mock (cadena de fallback)
-- [x] **Score transparente en UI**:
+  - Fix: antes linkeaba al catálogo `/p/MLA...` (buy-box winner, precio diferente)
+- [x] **Sellers reales + reputación**: OTECH2025 (platinum), PYMTECNO (gold), etc.
+  - Mapeo ML: 5_green → green, power_seller → platinum/gold
+- [x] **Items internacionales (CBT)**:
+  - Detectados via tags `cbt_item`, `cbt_fulfillment_us/cn`
+  - Marcados con badge 🌍 INTL en UI
+  - Precio total = base + 35% impuestos estimados (compite justo con nacionales)
+  - Desglose visible: "Base $X + imp. $Y"
+- [x] **Score transparente**:
   - Fórmula visible: precio 50% + reputación 25% + envío 15% + cuotas 10%
   - Columna Score con tooltip de desglose por componente
-  - `score_breakdown` en cada `RankedResult`
-- [x] **Badge de items internacionales**: 🌍 INTL con desglose (Base + imp.)
-- [x] **Sellers reales**: OTECH2025 (platinum), PYMTECNO (gold), etc.
-- [x] **Token manager**: 3 estrategias (cookie → server → client_credentials)
-- [x] **Tabla `ml_server_tokens`** en Supabase
-- [x] Build pasa ✅ + deployed a Vercel
+- [x] **Validación de modelo** (v4 — FIX CRÍTICO):
+  - `extractModelTokens()` extrae identificadores: "Galaxy S26", "iPhone 16", "Redmi Note 13"
+  - `isProductMatch()` valida que productos del catálogo matcheen el modelo buscado
+  - Filtra S25 cuando buscás S26, iPhone 15 cuando buscás iPhone 16
+  - Fallback: si ningún producto matchea, muestra todos
+- [x] **OAuth con cuenta del proyecto**: argentracker1@gmail.com (UserID: 3338201172)
+- [x] **Orchestrator**: Products API → Scraper → Mock (cadena de fallback)
+- [x] **Gemini keys 4 y 5 verificadas**: Formato `AQ.Ab8...` funcional (429=rate limit, no error auth)
 
 ### ✅ Verificado en producción
-- 71+ items reales con precios de ML
-- Links van directo a la publicación del vendedor (precio correcto)
-- Thumbnails reales de ML CDN
-- Sellers con nombre real y reputación
+- Samsung Galaxy S26 Ultra → solo S26 (no S25) ✅
+- Apple iPhone 16 128GB → solo iPhone 16 (no 11/15) ✅
+- 66-71 items reales con precios de ML
+- Links van al vendedor específico (precio exacto) ✅
+- Sellers reales + reputación (platinum/gold/green) ✅
 - ~1s (cache) / ~4s (fresco) respuesta
-- Gemini Vision detecta productos correctamente desde capturas
 
 ---
 
 ## ⚠️ Issues Conocidos
 
-### 1. Server token — Actualmente con cuenta PERSONAL
-- El token actual en Supabase es de la cuenta `CIANO_S` (10830594) — cuenta personal
-- **ACCIÓN REQUERIDA**: Re-autorizar con `argentracker1@gmail.com` (cuenta del proyecto)
-- **URL para re-autorizar** (logear primero en ML con argentracker1@gmail.com):
-  ```
-  https://auth.mercadolibre.com.ar/authorization?response_type=code&client_id=3531144650908300&redirect_uri=https://argentracker.vercel.app/api/auth/ml/callback
-  ```
+### 1. Impuestos CBT estimados (no exactos)
+- No hay endpoint de ML que exponga impuestos de importación
+- Se probaron 7 endpoints: `/items/{id}`, `/prices`, `/taxes_for_buyer`, multiget, `/cbt/taxes`, `/purchases/import_charges`, `/sites/MLA/cbt/tariffs` — todos bloqueados o inexistentes
+- ML renderiza impuestos client-side via JavaScript (no en HTML)
+- **Solución actual**: Estimado 35% (dato real observado: 34.65% para iPhone 16)
+- **Impacto**: El precio total de internacionales puede variar ±5% del real
 
-### 2. Productos muy nuevos no están en catálogo
-- Samsung S26 Ultra: Existe en el catálogo pero la búsqueda puede devolver S25 por similaridad
-- **Pendiente**: Validar que el nombre del producto encontrado matchea con la búsqueda original
-
-### 3. API Keys — Seguras
+### 2. API Keys seguras
 - Las keys están solo en `.env.local` (gitignored) y Vercel env vars
 - **5 Gemini keys** para rotación: `GEMINI_API_KEY` a `GEMINI_API_KEY_5`
 - **Regla**: NUNCA poner API keys en archivos que van a git
 
-### 4. Gemini Keys 4 y 5 — Formato diferente
-- Keys 1-3: prefijo `AIza...` (Google AI Studio)
-- Keys 4-5: prefijo `AQ.Ab8RN6...` (formato diferente, verificar si funcionan)
-
-### 5. Impuestos CBT estimados
-- Los impuestos de items internacionales se estiman al 35% (basado en datos reales)
-- Dato real observado: $1,035,040 base + $358,605 impuestos = 34.6%
-- Los impuestos reales varían por categoría y no son accesibles via API
-
 ---
 
-## 🔜 Fase 4 — Próximos pasos (por prioridad)
+## 🔜 Fase 4 — Próximos pasos
 
 ### Alta prioridad
-1. **Campo de Código Postal** — Input en la UI para que el usuario ingrese su CP
-2. **Re-autorizar OAuth con argentracker1@gmail.com** — Reemplazar token personal
-3. **Validar match de productos** — Verificar que el producto encontrado coincide con la búsqueda
+1. **Campo de Código Postal** — Input en la UI para filtrar envíos a la ubicación del usuario
+2. **Mejorar resultados usados** — Products API solo retorna nuevos del catálogo
 
 ### Media prioridad
-4. **OAuth por usuario** — Cada usuario vincula su cuenta ML para:
-   - CP automático
-   - Envíos filtrados a su ubicación
-5. **Filtro de envío por ubicación** — Usando `/items/{id}/shipping_options?zip_code=...`
-6. **Mejorar resultados usados** — Products API solo retorna nuevos del catálogo
+3. **OAuth por usuario** — Cada usuario vincula su cuenta ML para CP automático
+4. **Filtro de envío por ubicación** — Usando `/items/{id}/shipping_options?zip_code=...` (funciona ✅)
+5. **Cloudflare Worker** — Deprecar (ya no necesario con Products API)
 
 ### Baja prioridad
-7. **Impuestos CBT exactos** — Varían por categoría, actualmente estimados al 35%
-8. **Cloudflare Worker** — Actualizar o deprecar (ya no se necesita con Products API)
+6. **Impuestos CBT exactos** — Si ML abre un endpoint, usarlo
+7. **Ampliar patrones de modelo** — Agregar más marcas/formatos al matcher
 
 ---
 
 ## 📁 Archivos clave del proyecto
 
 ### Core
-- `app/src/lib/mercadolibre/product-search.ts` — Connector Products API v3 (PRINCIPAL)
+- `app/src/lib/mercadolibre/product-search.ts` — Connector Products API v4 (PRINCIPAL)
 - `app/src/lib/agents/orchestrator.ts` — Coordinación del pipeline de búsqueda
 - `app/src/lib/agents/price-ranker.ts` — Scoring + ranking + detección internacional
 - `app/src/lib/mercadolibre/token-manager.ts` — Gestión de tokens ML (3 estrategias)
@@ -127,20 +108,38 @@
 - `app/src/app/api/auth/ml/callback/route.ts` — OAuth callback de ML
 
 ### Frontend
-- `app/src/app/results/page.tsx` — Página de resultados con badges intl + score
+- `app/src/app/results/page.tsx` — Resultados con badges intl + score + reputación
 - `app/src/app/page.tsx` — Landing con input de búsqueda y captura
 
 ### Tipos
-- `app/src/types/index.ts` — RankedResult, MLItem, etc.
+- `app/src/types/index.ts` — RankedResult con score_breakdown, is_international, base_price, estimated_taxes
+
+### Flujo de búsqueda
+```
+📸 Captura → 🤖 Gemini Vision (extrae nombre)
+                    ↓
+               🔑 Token argentracker1@gmail.com
+                    ↓
+               📡 ML Products API (3 llamadas paralelas)
+                    ↓
+               🔍 Validación de modelo (extractModelTokens)
+                    ↓
+               👥 Batch /users (nombres + rep)
+                    ↓
+               🌍 Detección CBT (+ impuestos estimados)
+                    ↓
+               📊 Score ranking → 🖥️ Resultados
+```
 
 ### Datos OAuth del proyecto ML
 - **Client ID**: 3531144650908300
+- **Cuenta**: argentracker1@gmail.com (UserID: 3338201172)
 - **Redirect URI**: https://argentracker.vercel.app/api/auth/ml/callback
-- **App state**: Test mode (no aprobada para producción)
+- **App state**: Test mode
 
 ---
 
 ## 📊 Progreso General
 ```
-[▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░] 90% — Fase 3 completada, datos reales funcionando
+[▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░] 95% — Motor de búsqueda real completo y validado
 ```
