@@ -58,6 +58,8 @@ interface ScrapedItem {
   permalink: string;
   thumbnail: string | null;
   freeShipping: boolean;
+  isCbt: boolean;
+  sellerName: string;
 }
 
 function parsePolycards(html: string, condition: string): ScrapedItem[] {
@@ -107,6 +109,14 @@ function parsePolycards(html: string, condition: string): ScrapedItem[] {
     // Shipping
     const freeShipping = /gratis|free_shipping":true/i.test(forward.substring(0, 1500));
 
+    // CBT (international) detection
+    const isCbt = /"type":"cbt"/.test(forward);
+
+    // Seller name
+    const sellerMatch = forward.match(/"official_store_text":"([^"]+)"/) ||
+                        forward.match(/"seller_name":"([^"]+)"/);
+    const sellerName = sellerMatch ? unesc(sellerMatch[1]) : (isCbt ? "Vendedor Internacional" : "Vendedor ML");
+
     // Skip items without title or very low price (accessories)
     if (!title || price < 50000) continue;
 
@@ -120,6 +130,8 @@ function parsePolycards(html: string, condition: string): ScrapedItem[] {
       permalink,
       thumbnail,
       freeShipping,
+      isCbt,
+      sellerName,
     });
   }
 
@@ -128,8 +140,8 @@ function parsePolycards(html: string, condition: string): ScrapedItem[] {
 
 async function fetchMLSearch(query: string, condition: string): Promise<{ items: ScrapedItem[]; htmlLength: number; redirected: boolean; finalUrl: string }> {
   const slug = query.trim().replace(/\s+/g, "-");
-  const condSuffix = condition === "used" ? "_Usado" : "_Nuevo";
-  const mlUrl = `https://listado.mercadolibre.com.ar/${slug}${condSuffix}_OrderId_PRICE_NoIndex_True`;
+  const condSuffix = condition === "used" ? "_Usado" : "";
+  const mlUrl = `https://listado.mercadolibre.com.ar/${slug}${condSuffix}`;
 
   const res = await fetch(mlUrl, {
     headers: {

@@ -290,12 +290,32 @@ export async function searchViaProducts(
           allProducts.push(p);
         }
       }
-      console.log(`[MLProducts] Query "${q}" → ${searchResult.results.length} products (total unique: ${allProducts.length})`);
-      // If we have enough products, stop searching
+      console.log(`[MLProducts] Query "${q}" (MLA) → ${searchResult.results.length} products (total unique: ${allProducts.length})`);
       if (allProducts.length >= 8) break;
     } else {
-      console.log(`[MLProducts] Query "${q}" → 0 products`);
+      console.log(`[MLProducts] Query "${q}" (MLA) → 0 products`);
     }
+  }
+
+  // Step 1a-CBT: Also search CBT catalog for international products
+  // CBT products have separate catalog entries with items tagged cbt_item
+  const cbtQuery = queries[0]; // use original query for CBT
+  const cbtResult = await mlFetch<MLProductSearchResult>(
+    `/products/search?status=active&site_id=CBT&q=${encodeURIComponent(cbtQuery)}&limit=5`,
+    accessToken
+  );
+  if (cbtResult?.results?.length) {
+    let cbtAdded = 0;
+    for (const p of cbtResult.results) {
+      // Convert CBT ID to MLA format and add both
+      const mlaId = p.id.replace(/^CBT/, "MLA");
+      if (!allProductIds.has(mlaId)) {
+        allProductIds.add(mlaId);
+        allProducts.push({ ...p, id: mlaId });
+        cbtAdded++;
+      }
+    }
+    console.log(`[MLProducts] CBT search → ${cbtResult.results.length} products, ${cbtAdded} new unique`);
   }
 
   if (!allProducts.length) {
