@@ -88,6 +88,49 @@ function isProductMatch(productName: string, queryTokens: string[]): boolean {
   return queryTokens.some((token) => lower.includes(token));
 }
 
+// Build progressively shorter query variants for better product discovery.
+// Long queries with specific specs (8gb, 256gb, Ssd, W11) often miss products
+// in the ML catalog because products are listed under slightly different names.
+function buildQueryVariants(query: string): string[] {
+  const variants: string[] = [query]; // original first
+  const words = query.split(/\s+/);
+  
+  if (words.length <= 4) return variants; // short queries don't need variants
+
+  // Remove noise words: "ssd", "ram", "ddr", "w11", "win", "windows", "negro", "blanco", etc.
+  const noiseWords = new Set([
+    "ssd", "hdd", "nvme", "ram", "ddr4", "ddr5", "ddr",
+    "w11", "w10", "win", "win11", "win10", "windows",
+    "negro", "blanco", "azul", "rosa", "gris", "rojo", "verde", "plateado",
+    "black", "white", "blue", "pink", "gray", "red", "silver",
+    "nuevo", "new", "dual", "sim", "5g", "4g", "lte",
+    "fhd", "uhd", "oled", "ips", "lcd",
+  ]);
+
+  // Remove size specs: "8gb", "256gb", "512gb", "12gb", etc.
+  const specPattern = /^\d+\s*gb$/i;
+
+  const filtered = words.filter((w) => {
+    const lw = w.toLowerCase();
+    if (noiseWords.has(lw)) return false;
+    if (specPattern.test(lw)) return false;
+    return true;
+  });
+
+  if (filtered.length < words.length && filtered.length >= 3) {
+    variants.push(filtered.join(" "));
+  }
+
+  // Even shorter: remove "Notebook/Laptop" prefix + generic words like "Intel", "Core"
+  const genericWords = new Set(["notebook", "laptop", "computadora", "portatil", "intel", "core", "amd", "ryzen", "i3", "i5", "i7", "i9"]);
+  const essential = filtered.filter((w) => !genericWords.has(w.toLowerCase()));
+  if (essential.length >= 2 && essential.length < filtered.length) {
+    variants.push(essential.join(" "));
+  }
+
+  return variants;
+}
+
 async function mlFetch<T>(path: string, token: string): Promise<T | null> {
   try {
     const res = await fetch(`${ML_API}${path}`, {
@@ -228,28 +271,46 @@ export async function searchViaProducts(
 ): Promise<{ new: MLItem[]; used: MLItem[] }> {
   console.log(`[MLProducts] Searching products for: "${query}"`);
 
-  // Step 1: Search product catalog
-  const searchResult = await mlFetch<MLProductSearchResult>(
-    `/products/search?status=active&site_id=MLA&q=${encodeURIComponent(query)}&limit=10`,
-    accessToken
-  );
+  // Step 1: Search product catalog with progressive query shortening
+  // Long queries (e.g. "Notebook Asus Vivobook 14 Intel 5 120u 8gb 256gb Ssd W11")
+  // often miss products. We try shorter queries as fallback.
+  const queries = buildQueryVariants(query);
+  let allProductIds = new Set<string>();
+  let allProducts: Array<{ id: string; name: string; domain_id: string }> = [];
 
-  if (!searchResult?.results?.length) {
-    console.warn("[MLProducts] No products found in catalog");
+  for (const q of queries) {
+    const searchResult = await mlFetch<MLProductSearchResult>(
+      `/products/search?status=active&site_id=MLA&q=${encodeURIComponent(q)}&limit=10`,
+      accessToken
+    );
+    if (searchResult?.results?.length) {
+      for (const p of searchResult.results) {
+        if (!allProductIds.has(p.id)) {
+          allProductIds.add(p.id);
+          allProducts.push(p);
+        }
+      }
+      console.log(`[MLProducts] Query "${q}" → ${searchResult.results.length} products (total unique: ${allProducts.length})`);
+      // If we have enough products, stop searching
+      if (allProducts.length >= 8) break;
+    } else {
+      console.log(`[MLProducts] Query "${q}" → 0 products`);
+    }
+  }
+
+  if (!allProducts.length) {
+    console.warn("[MLProducts] No products found in catalog after all query variants");
     return { new: [], used: [] };
   }
 
-  console.log(`[MLProducts] Found ${searchResult.results.length} products in catalog`);
-
   // Step 1b: Validate product names match the search query [Ref 10]
-  // This prevents showing Samsung S25 when S26 was searched.
   const queryTokens = extractModelTokens(query);
   console.log(`[MLProducts] Model tokens from query: [${queryTokens.join(", ")}]`);
 
-  const matchedProducts = searchResult.results.filter((p) => {
+  const matchedProducts = allProducts.filter((p) => {
     const matches = isProductMatch(p.name, queryTokens);
     if (!matches) {
-      console.warn(`[MLProducts] ⚠ Filtered out non-matching product: "${p.name}" (query tokens: [${queryTokens.join(", ")}])`);
+      console.warn(`[MLProducts] ⚠ Filtered out non-matching product: "${p.name}"`);
     }
     return matches;
   });
@@ -258,8 +319,8 @@ export async function searchViaProducts(
     console.warn(`[MLProducts] No products matched the query model. Using all results as fallback.`);
   }
 
-  // Step 2: Fetch items + details for top 5 MATCHED products IN PARALLEL
-  const products = (matchedProducts.length > 0 ? matchedProducts : searchResult.results).slice(0, 5);
+  // Step 2: Fetch items + details for top 8 MATCHED products IN PARALLEL
+  const products = (matchedProducts.length > 0 ? matchedProducts : allProducts).slice(0, 8);
   await humanDelay();
 
   const productDataPromises = products.map(async (product) => {

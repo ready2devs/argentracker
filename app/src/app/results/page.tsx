@@ -165,18 +165,21 @@ function ResultsContent() {
       <section className="mb-12 bg-surface-container-lowest rounded-xl p-6 md:p-8" id="product-summary">
         <div className="flex flex-col md:flex-row items-center gap-8">
           <div className="w-full md:w-1/3 bg-surface-container rounded-lg flex items-center justify-center p-4 h-48">
-            {data.bestNew?.thumbnail ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={data.bestNew.thumbnail}
-                alt={data.productName}
-                className="max-h-full max-w-full object-contain"
-              />
-            ) : (
-              <span className="material-symbols-outlined text-6xl text-outline-variant">
-                devices
-              </span>
-            )}
+            {(() => {
+              const thumb = data.bestNew?.thumbnail || data.bestUsed?.thumbnail || data.results?.find(r => r.thumbnail)?.thumbnail;
+              return thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={thumb}
+                  alt={data.productName}
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                <span className="material-symbols-outlined text-6xl text-outline-variant">
+                  devices
+                </span>
+              );
+            })()}
           </div>
           <div className="w-full md:w-2/3">
             <span className="inline-flex px-3 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-full mb-3">
