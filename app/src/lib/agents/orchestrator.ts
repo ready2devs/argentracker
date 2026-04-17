@@ -4,7 +4,7 @@ import { generateMockResults } from "@/lib/mercadolibre/mock-data";
 import { rankResults, calcAvgPrice } from "@/lib/agents/price-ranker";
 import { dbManager } from "@/lib/agents/database-manager";
 import { getMLToken } from "@/lib/mercadolibre/token-manager";
-import type { RankedResult } from "@/types";
+import type { RankedResult, MLItem } from "@/types";
 
 // ================================================
 // Orchestrator — Coordinates the search pipeline
@@ -85,48 +85,50 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
     authSource = tokenResult.source;
   }
 
-  // 2. Try ML Product Catalog API (primary — works with our token)
-  if (accessToken) {
-    try {
-      console.log("[Orchestrator] 🔍 Trying ML Product Catalog API (source:", authSource, ")");
-      const { new: newItems, used: usedItems } = await searchViaProducts(
-        input.query,
-        accessToken
-      );
-      allItems = [...newItems, ...usedItems];
+  // 2. Run Products API + Scraper IN PARALLEL for best coverage
+  // Products API is best for catalog items (national sellers with reputation)
+  // Scraper is best for items NOT in catalog (international/CBT sellers)
+  const apiPromise = accessToken
+    ? searchViaProducts(input.query, accessToken).catch((err) => {
+        console.warn("[Orchestrator] Products API failed:", String(err).slice(0, 120));
+        return { new: [] as MLItem[], used: [] as MLItem[] };
+      })
+    : Promise.resolve({ new: [] as MLItem[], used: [] as MLItem[] });
 
-      if (allItems.length > 0) {
-        dataSource = "api";
-        console.log(
-          `[Orchestrator] ✅ Products API: ${newItems.length} new + ${usedItems.length} used`
-        );
-      } else {
-        throw new Error("No results from Products API");
-      }
-    } catch (err) {
-      console.warn("[Orchestrator] Products API failed:", String(err).slice(0, 120));
-      allItems = null;
+  const scraperPromise = scrapeMLBothConditions(input.query).catch((err) => {
+    console.warn("[Orchestrator] Scraper failed:", String(err).slice(0, 120));
+    return { new: [] as MLItem[], used: [] as MLItem[] };
+  });
+
+  const [apiResult, scraperResult] = await Promise.all([apiPromise, scraperPromise]);
+
+  // Merge: API items take priority (have reputation), then add scraper items (have CBT)
+  const seenIds = new Set<string>();
+  const mergedItems: MLItem[] = [];
+
+  // Add API items first (higher quality data: reputation, thumbnails)
+  for (const item of [...apiResult.new, ...apiResult.used]) {
+    if (!seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      mergedItems.push(item);
     }
   }
 
-  // 3. Fallback: ML Web Scraper (works from non-blocked IPs)
-  if (!allItems || allItems.length === 0) {
-    try {
-      console.log("[Orchestrator] 🌐 Trying web scraper...");
-      const { new: newItems, used: usedItems } = await scrapeMLBothConditions(input.query);
-      allItems = [...newItems, ...usedItems];
-
-      if (allItems.length > 0) {
-        dataSource = "scraper";
-        console.log(
-          `[Orchestrator] ✅ Scraper: ${newItems.length} new + ${usedItems.length} used`
-        );
-      } else {
-        throw new Error("Scraper returned 0 results");
-      }
-    } catch (err) {
-      console.warn("[Orchestrator] Scraper failed:", String(err).slice(0, 120));
+  // Add scraper items that aren't duplicates (captures CBT/international)
+  for (const item of [...scraperResult.new, ...scraperResult.used]) {
+    if (!seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      mergedItems.push(item);
     }
+  }
+
+  const apiCount = apiResult.new.length + apiResult.used.length;
+  const scraperCount = scraperResult.new.length + scraperResult.used.length;
+  console.log(`[Orchestrator] API: ${apiCount} items | Scraper: ${scraperCount} items | Merged: ${mergedItems.length} unique`);
+
+  if (mergedItems.length > 0) {
+    allItems = mergedItems;
+    dataSource = apiCount > 0 ? "api" : "scraper";
   }
 
   // 4. Last resort: Mock data
