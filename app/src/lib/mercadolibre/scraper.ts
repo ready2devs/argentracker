@@ -32,7 +32,7 @@ function buildSearchUrl(query: string, condition?: "new" | "used"): string {
   let url = `https://listado.mercadolibre.com.ar/${encodeURIComponent(slug)}`;
   if (condition === "new") url += "_Nuevo";
   if (condition === "used") url += "_Usado";
-  url += "_OrderId_PRICE_NoIndex_True";
+  // Don't sort by price — default ML sort brings international items too
   return url;
 }
 
@@ -99,33 +99,58 @@ function parsePolycards(html: string, condition: "new" | "used"): MLItem[] {
       if (imgMatch) thumbnail = imgMatch[1];
     }
 
+    // Detect CBT (international) items
+    const isCbt = /"type":"cbt"/.test(forward);
+
+    // Seller name — try to extract from official_store or seller component
+    const sellerMatch = forward.match(/"official_store_text":"([^"]+)"/) ||
+                        forward.match(/"seller_name":"([^"]+)"/) ||
+                        forward.match(/"power_seller_status":"([^"]+)"/);
+    const sellerName = sellerMatch ? unescapeUrl(sellerMatch[1]) : (isCbt ? "Vendedor Internacional" : "Vendedor ML");
+
     // Shipping
     const freeShipMatch = forward.match(/"free_shipping":true/);
     const hasFreeShip = !!freeShipMatch || /gratis/i.test(forward.substring(0, 1500));
 
-    // Skip items without title or price, and accessories (price < 100k)
-    if (!title || price < 100000) continue;
+    // Skip items without title or price, and accessories (price < 50k)
+    if (!title || price < 50000) continue;
+
+    // Build tags for CBT items
+    const tags: string[] = [];
+    if (isCbt) {
+      tags.push("cbt_item");
+      tags.push("_argentracker_international");
+      tags.push(`_argentracker_base_price_${price}`);
+      // Estimate taxes — use 11% for cheaper items (notebooks), 35% for phones
+      const estimatedTaxRate = price < 800000 ? 0.11 : 0.35;
+      const estimatedTaxes = Math.round(price * estimatedTaxRate);
+      tags.push(`_argentracker_estimated_taxes_${estimatedTaxes}`);
+    }
+
+    // For international items, adjust price to include estimated taxes
+    const finalPrice = isCbt ? Math.round(price * (price < 800000 ? 1.11 : 1.35)) : price;
 
     items.push({
       id: itemId,
-      title,
-      price,
+      title: isCbt ? `${title} (Internacional)` : title,
+      price: finalPrice,
       currency_id: "ARS",
       condition,
       permalink,
       thumbnail,
       seller: {
-        nickname: "Vendedor ML",
+        nickname: sellerName,
         reputation: null,
       },
       shipping: { free_shipping: hasFreeShip },
       address: null,
       installments: null,
-      tags: [],
+      tags,
     });
   }
 
-  console.log(`[MLScraper] Parsed ${items.length} polycards (${condition})`);
+  const intlCount = items.filter(i => i.tags?.includes('_argentracker_international')).length;
+  console.log(`[MLScraper] Parsed ${items.length} polycards (${condition}, ${intlCount} intl)`);
   return items;
 }
 
@@ -165,13 +190,22 @@ export async function scrapeMLSearch(
   }
 }
 
-// Search both conditions
+// Search both conditions — also do one "all" search to catch CBT items
 export async function scrapeMLBothConditions(
   query: string
 ): Promise<{ new: MLItem[]; used: MLItem[] }> {
-  const [newItems, usedItems] = await Promise.all([
-    scrapeMLSearch(query, "new"),
-    scrapeMLSearch(query, "used").catch(() => [] as MLItem[]),
-  ]);
-  return { new: newItems, used: usedItems };
+  // Single search without condition filter captures ALL items including international
+  const allItems = await scrapeMLSearch(query, "new"); // default HTML has new+intl
+  
+  // Also try used separately (different URL)
+  const usedItems = await scrapeMLSearch(query, "used").catch(() => [] as MLItem[]);
+  
+  // Separate new items (including international which compete as "new")
+  const newItems = allItems; // all from default search are new condition
+  
+  // De-duplicate: remove from used any item already in new
+  const newIds = new Set(newItems.map(i => i.id));
+  const uniqueUsed = usedItems.filter(i => !newIds.has(i.id));
+  
+  return { new: newItems, used: uniqueUsed };
 }
