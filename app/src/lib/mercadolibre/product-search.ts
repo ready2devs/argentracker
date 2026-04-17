@@ -38,6 +38,56 @@ const ML_API = "https://api.mercadolibre.com";
 // Includes: import duty + statistics fee (3%) + IVA (21%)
 const CBT_ESTIMATED_TAX_RATE = 0.35;
 
+// ---- Product Name Matching ----
+// Extracts key model identifiers from a query to validate product results.
+// Example: "Samsung Galaxy S26 Ultra 512gb" → ["galaxy s26", "s26 ultra"]
+// This prevents showing S25 results when S26 was searched.
+
+function extractModelTokens(text: string): string[] {
+  const lower = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+  // Common patterns: "iphone 16", "galaxy s26", "redmi note 13", "pixel 9"
+  const modelPatterns = [
+    /(?:iphone|ipad|macbook|airpods)\s*(?:pro|max|plus|mini|air|se)?\s*(\d+)/,
+    /galaxy\s*[sazmf]\s*(\d+)/,
+    /redmi\s*(?:note)?\s*(\d+)/,
+    /pixel\s*(\d+)/,
+    /moto\s*[gex]\s*(\d+)/,
+    /xperia\s*(\d+)/,
+    /(?:mi|poco)\s*[a-z]*\s*(\d+)/,
+  ];
+
+  const tokens: string[] = [];
+
+  for (const pattern of modelPatterns) {
+    const match = lower.match(pattern);
+    if (match) {
+      // Get the full match (e.g., "galaxy s26") and the model number (e.g., "26")
+      tokens.push(match[0].trim());
+      break;
+    }
+  }
+
+  // Fallback: extract brand + number patterns like "s26", "a55"
+  const alphaNumPatterns = lower.match(/\b[a-z]\d{1,3}\b/g);
+  if (alphaNumPatterns) {
+    for (const an of alphaNumPatterns) {
+      if (!tokens.some((t) => t.includes(an))) {
+        tokens.push(an);
+      }
+    }
+  }
+
+  return tokens;
+}
+
+function isProductMatch(productName: string, queryTokens: string[]): boolean {
+  if (queryTokens.length === 0) return true; // no tokens extracted = accept all
+  const lower = productName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
+  // At least ONE model token must be present in the product name
+  return queryTokens.some((token) => lower.includes(token));
+}
+
 async function mlFetch<T>(path: string, token: string): Promise<T | null> {
   try {
     const res = await fetch(`${ML_API}${path}`, {
@@ -191,8 +241,25 @@ export async function searchViaProducts(
 
   console.log(`[MLProducts] Found ${searchResult.results.length} products in catalog`);
 
-  // Step 2: Fetch items + details for top 5 products IN PARALLEL
-  const products = searchResult.results.slice(0, 5);
+  // Step 1b: Validate product names match the search query [Ref 10]
+  // This prevents showing Samsung S25 when S26 was searched.
+  const queryTokens = extractModelTokens(query);
+  console.log(`[MLProducts] Model tokens from query: [${queryTokens.join(", ")}]`);
+
+  const matchedProducts = searchResult.results.filter((p) => {
+    const matches = isProductMatch(p.name, queryTokens);
+    if (!matches) {
+      console.warn(`[MLProducts] ⚠ Filtered out non-matching product: "${p.name}" (query tokens: [${queryTokens.join(", ")}])`);
+    }
+    return matches;
+  });
+
+  if (matchedProducts.length === 0) {
+    console.warn(`[MLProducts] No products matched the query model. Using all results as fallback.`);
+  }
+
+  // Step 2: Fetch items + details for top 5 MATCHED products IN PARALLEL
+  const products = (matchedProducts.length > 0 ? matchedProducts : searchResult.results).slice(0, 5);
   await humanDelay();
 
   const productDataPromises = products.map(async (product) => {
