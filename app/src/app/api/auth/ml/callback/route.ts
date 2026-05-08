@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { saveServerToken } from "@/lib/mercadolibre/token-manager";
 
 // ================================================
@@ -40,16 +41,31 @@ export async function GET(request: NextRequest) {
   };
 
   try {
+    // Retrieve PKCE code_verifier from cookie (set during /login)
+    const cookieStore = await cookies();
+    const codeVerifier = cookieStore.get("ml_code_verifier")?.value;
+
+    if (!codeVerifier) {
+      console.error("[ML OAuth] No code_verifier found in cookies — PKCE flow broken");
+    }
+
+    const tokenBody: Record<string, string> = {
+      grant_type: "authorization_code",
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      code,
+      redirect_uri: REDIRECT_URI,
+    };
+
+    // Add code_verifier for PKCE (required by ML)
+    if (codeVerifier) {
+      tokenBody.code_verifier = codeVerifier;
+    }
+
     const res = await fetch("https://api.mercadolibre.com/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        code,
-        redirect_uri: REDIRECT_URI,
-      }),
+      body: new URLSearchParams(tokenBody),
     });
 
     if (!res.ok) {
