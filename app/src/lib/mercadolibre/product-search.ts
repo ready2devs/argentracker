@@ -493,5 +493,94 @@ export async function searchViaProducts(
   usedItems.sort((a, b) => a.price - b.price);
 
   console.log(`[MLProducts] Final: ${newItems.length} new + ${usedItems.length} used (${intlCount} intl with tax adjustment)`);
+
+  // Step 5: Complementary Items Search — capture used listings not in catalog
+  // Products API returns mostly catalog (new) items. Used items are standalone
+  // listings that need the Items Search API (/sites/MLA/search).
+  if (usedItems.length === 0 || newItems.length < 3) {
+    console.log(`[MLProducts] Complementing with Items Search API (used: ${usedItems.length}, new: ${newItems.length})`);
+    const seenItemIds = new Set([...newItems, ...usedItems].map((i) => i.id));
+
+    const conditions = usedItems.length === 0 ? ["used", "new"] : ["used"];
+    for (const cond of conditions) {
+      try {
+        const itemsSearch = await mlFetch<{
+          results: Array<{
+            id: string;
+            title: string;
+            price: number;
+            currency_id: string;
+            condition: string;
+            permalink: string;
+            thumbnail: string;
+            shipping: { free_shipping: boolean };
+            seller: { id: number; nickname: string };
+            address?: { city_name: string; state_name: string };
+            installments?: { quantity: number; rate: number } | null;
+          }>;
+          paging: { total: number };
+        }>(
+          `/sites/MLA/search?q=${encodeURIComponent(query)}&condition=${cond}&sort=price_asc&limit=10`,
+          accessToken
+        );
+
+        if (itemsSearch?.results?.length) {
+          for (const item of itemsSearch.results) {
+            if (seenItemIds.has(item.id)) continue;
+            if (item.price <= 0) continue;
+
+            // Filter accessories
+            const titleLower = item.title.toLowerCase();
+            const isAccessory = ACCESSORY_KEYWORDS.some((kw) => titleLower.includes(kw));
+            if (isAccessory) continue;
+
+            // Check model match
+            if (!isProductMatch(item.title, queryTokens)) continue;
+
+            seenItemIds.add(item.id);
+
+            const mlItem: MLItem = {
+              id: item.id,
+              title: item.title,
+              price: Math.round(item.price),
+              currency_id: item.currency_id || "ARS",
+              condition: cond as "new" | "used",
+              permalink: item.permalink,
+              thumbnail: item.thumbnail,
+              seller: {
+                nickname: item.seller?.nickname || "Vendedor ML",
+                reputation: null, // Items API doesn't return reputation level
+              },
+              shipping: {
+                free_shipping: item.shipping?.free_shipping || false,
+              },
+              address: item.address ? {
+                city_name: item.address.city_name || "",
+                state_name: item.address.state_name || "",
+              } : null,
+              installments: item.installments || null,
+              tags: [],
+            };
+
+            if (cond === "used") {
+              usedItems.push(mlItem);
+            } else if (cond === "new") {
+              newItems.push(mlItem);
+            }
+          }
+
+          // Re-sort after adding
+          if (cond === "used") usedItems.sort((a, b) => a.price - b.price);
+          if (cond === "new") newItems.sort((a, b) => a.price - b.price);
+
+          console.log(`[MLProducts] Items Search (${cond}): found ${itemsSearch.results.length} items, added ${cond === "used" ? usedItems.length : "new items"}`);
+        }
+      } catch (err) {
+        console.warn(`[MLProducts] Items Search (${cond}) failed:`, String(err).slice(0, 100));
+      }
+    }
+  }
+
+  console.log(`[MLProducts] Total final: ${newItems.length} new + ${usedItems.length} used`);
   return { new: newItems, used: usedItems };
 }
