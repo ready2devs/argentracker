@@ -138,9 +138,9 @@ function parsePolycards(html: string, condition: string): ScrapedItem[] {
   return items;
 }
 
-async function fetchMLSearch(query: string, condition: string): Promise<{ items: ScrapedItem[]; htmlLength: number; redirected: boolean; finalUrl: string }> {
+async function fetchMLSearch(query: string, condition: string): Promise<{ items: ScrapedItem[]; htmlLength: number; redirected: boolean; finalUrl: string; geoRedirected: boolean }> {
   const slug = query.trim().replace(/\s+/g, "-");
-  const condSuffix = condition === "used" ? "_Usado" : "";
+  const condSuffix = condition === "used" ? "_Usado" : condition === "new" ? "_Nuevo" : "";
   const mlUrl = `https://listado.mercadolibre.com.ar/${slug}${condSuffix}`;
 
   const res = await fetch(mlUrl, {
@@ -159,10 +159,19 @@ async function fetchMLSearch(query: string, condition: string): Promise<{ items:
   });
 
   const html = await res.text();
-  const redirected = res.url !== mlUrl;
+  const finalUrl = res.url || mlUrl;
+  const redirected = finalUrl !== mlUrl;
+
+  // ⚠ GEO-REDIRECT DETECTION: Check if ML sent us to a non-Argentine site
+  const geoRedirected = !finalUrl.includes("mercadolibre.com.ar") && !finalUrl.includes("listado.mercadolibre.com.ar");
+  if (geoRedirected) {
+    console.warn(`[MLProxy] ⚠ GEO-REDIRECT: ML sent us to ${finalUrl} instead of .com.ar`);
+    return { items: [], htmlLength: html.length, redirected, finalUrl, geoRedirected };
+  }
+
   const items = parsePolycards(html, condition);
 
-  return { items, htmlLength: html.length, redirected, finalUrl: res.url };
+  return { items, htmlLength: html.length, redirected, finalUrl, geoRedirected };
 }
 
 export default {

@@ -176,13 +176,21 @@ export async function scrapeMLSearch(
       redirect: "follow",
     });
 
+    // ⚠ GEO-REDIRECT DETECTION: If ML redirected to another country, reject
+    const finalUrl = res.url || url;
+    if (!finalUrl.includes("mercadolibre.com.ar") && !finalUrl.includes("mercadolibre.com.ar")) {
+      console.error(`[MLScraper] ⚠ GEO-REDIRECT DETECTED! ML sent us to: ${finalUrl}`);
+      console.error(`[MLScraper] This means our IP is not recognized as Argentine. Returning empty.`);
+      return [];
+    }
+
     if (!res.ok) {
       console.error(`[MLScraper] HTTP ${res.status}`);
       return [];
     }
 
     const html = await res.text();
-    console.log(`[MLScraper] Received ${html.length} bytes`);
+    console.log(`[MLScraper] Received ${html.length} bytes (final URL: ${finalUrl.substring(0, 80)}...)`);
     return parsePolycards(html, condition);
   } catch (err) {
     console.error("[MLScraper] Error:", String(err).slice(0, 150));

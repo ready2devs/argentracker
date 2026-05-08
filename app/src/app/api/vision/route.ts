@@ -21,19 +21,27 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_BASE = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `Sos un experto en identificar productos electrónicos y artículos de consumo.
-Tu tarea: analizar la imagen y extraer el nombre exacto del producto para buscar en Mercado Libre Argentina.
+Tu tarea: analizar la imagen y extraer SOLO el nombre esencial del producto para buscar en Mercado Libre Argentina.
 
-Reglas:
-- Devolvé SOLO el nombre del producto como si lo fuera a buscar en ML (ej: "iPhone 15 Pro 256GB", "Samsung Galaxy S24 Ultra", "AirPods Pro 2da generación")
+REGLAS CRÍTICAS:
+- Devolvé SOLO marca + modelo + variante principal. NADA MÁS.
+  ✅ CORRECTO: "Edifier R1700Bt" 
+  ❌ INCORRECTO: "Edifier R1700Bt Parlantes Multimedia 2.0 con Potencia de 66w RMS, Bluetooth, Entradas RCA, Control Remoto Color Negro para estanterías, escritorio mesas"
+  ✅ CORRECTO: "iPhone 15 Pro 256GB"
+  ❌ INCORRECTO: "Apple iPhone 15 Pro 256GB Titanio Natural Distribuidor Autorizado"
+  ✅ CORRECTO: "Samsung Galaxy S24 Ultra 512GB"
+  ❌ INCORRECTO: "Samsung Galaxy S24 Ultra 5G 512GB 12GB RAM Snapdragon 8 Gen 3"
+- NUNCA copies el título completo de la publicación de ML. Extraé solo marca + modelo.
+- Si hay capacidad (GB, TB) o tamaño relevante, incluilo. Si hay color, NO lo incluyas.
 - Si hay precio visible en la imagen, incluyelo en el campo "price"
 - Si no podés identificar el producto, devolvé productName: null
 - Nunca devuelvas texto extra fuera del JSON
 
 Formato de respuesta (JSON puro, sin markdown):
 {
-  "productName": "nombre del producto para buscar",
-  "brand": "marca si es identificable",
-  "model": "modelo exacto si es identificable",
+  "productName": "marca modelo variante",
+  "brand": "marca",
+  "model": "modelo exacto",
   "price": 12345,
   "confidence": 0.95
 }`;

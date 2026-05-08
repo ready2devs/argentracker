@@ -1,4 +1,5 @@
 import { searchViaProducts } from "@/lib/mercadolibre/product-search";
+import { scrapeViaProxy } from "@/lib/mercadolibre/proxy-scraper";
 import { scrapeMLBothConditions } from "@/lib/mercadolibre/scraper";
 import { generateMockResults } from "@/lib/mercadolibre/mock-data";
 import { rankResults, calcAvgPrice } from "@/lib/agents/price-ranker";
@@ -85,9 +86,9 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
     authSource = tokenResult.source;
   }
 
-  // 2. Run Products API + Scraper IN PARALLEL for best coverage
+  // 2. Run Products API + Proxy Scraper IN PARALLEL for best coverage
   // Products API is best for catalog items (national sellers with reputation)
-  // Scraper is best for items NOT in catalog (international/CBT sellers)
+  // Proxy Scraper goes through Cloudflare edge (avoids Vercel US geo-redirect)
   const apiPromise = accessToken
     ? searchViaProducts(input.query, accessToken).catch((err) => {
         console.warn("[Orchestrator] Products API failed:", String(err).slice(0, 120));
@@ -95,12 +96,26 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
       })
     : Promise.resolve({ new: [] as MLItem[], used: [] as MLItem[] });
 
-  const scraperPromise = scrapeMLBothConditions(input.query).catch((err) => {
-    console.warn("[Orchestrator] Scraper failed:", String(err).slice(0, 120));
+  // Primary scraper: Cloudflare proxy (better geo-locality than Vercel)
+  const proxyPromise = scrapeViaProxy(input.query).catch((err) => {
+    console.warn("[Orchestrator] Proxy scraper failed:", String(err).slice(0, 120));
     return { new: [] as MLItem[], used: [] as MLItem[] };
   });
 
-  const [apiResult, scraperResult] = await Promise.all([apiPromise, scraperPromise]);
+  const [apiResult, proxyResult] = await Promise.all([apiPromise, proxyPromise]);
+
+  const proxyCount = proxyResult.new.length + proxyResult.used.length;
+
+  // Fallback: if proxy returned 0 items, try direct scraper from Vercel
+  // (direct scraper may still work if ML doesn't redirect)
+  let scraperResult = proxyResult;
+  if (proxyCount === 0) {
+    console.log("[Orchestrator] Proxy returned 0 items, trying direct scraper as fallback...");
+    scraperResult = await scrapeMLBothConditions(input.query).catch((err) => {
+      console.warn("[Orchestrator] Direct scraper also failed:", String(err).slice(0, 120));
+      return { new: [] as MLItem[], used: [] as MLItem[] };
+    });
+  }
 
   // Merge: API items take priority (have reputation), then add scraper items (have CBT)
   const seenIds = new Set<string>();
@@ -124,7 +139,7 @@ export async function orchestrateSearch(input: SearchInput): Promise<SearchOutpu
 
   const apiCount = apiResult.new.length + apiResult.used.length;
   const scraperCount = scraperResult.new.length + scraperResult.used.length;
-  console.log(`[Orchestrator] API: ${apiCount} items | Scraper: ${scraperCount} items | Merged: ${mergedItems.length} unique`);
+  console.log(`[Orchestrator] API: ${apiCount} items | Proxy/Scraper: ${scraperCount} items (proxy: ${proxyCount}) | Merged: ${mergedItems.length} unique`);
 
   if (mergedItems.length > 0) {
     allItems = mergedItems;
