@@ -68,12 +68,28 @@ function extractModelTokens(text: string): string[] {
     }
   }
 
+  // Generic alphanumeric model numbers: "r1700bt", "ath m50x", "hs80", "k361", "hd599"
+  // Matches patterns like: letter(s) + digits (+ optional letters) — e.g. "r1700bt", "hs80", "k361"
+  // Or digits + letters — e.g. "50x", "599se"
+  if (tokens.length === 0) {
+    const alphaNumModels = lower.match(/\b[a-z]{1,4}\d{2,5}[a-z]{0,3}\b/g);
+    if (alphaNumModels) {
+      for (const model of alphaNumModels) {
+        if (!tokens.includes(model)) {
+          tokens.push(model);
+        }
+      }
+    }
+  }
+
   // Fallback: extract brand + number patterns like "s26", "a55"
-  const alphaNumPatterns = lower.match(/\b[a-z]\d{1,3}\b/g);
-  if (alphaNumPatterns) {
-    for (const an of alphaNumPatterns) {
-      if (!tokens.some((t) => t.includes(an))) {
-        tokens.push(an);
+  if (tokens.length === 0) {
+    const alphaNumPatterns = lower.match(/\b[a-z]\d{1,3}\b/g);
+    if (alphaNumPatterns) {
+      for (const an of alphaNumPatterns) {
+        if (!tokens.some((t) => t.includes(an))) {
+          tokens.push(an);
+        }
       }
     }
   }
@@ -81,9 +97,29 @@ function extractModelTokens(text: string): string[] {
   return tokens;
 }
 
+// Words that indicate an accessory/peripheral, not the main product
+const ACCESSORY_KEYWORDS = [
+  "soporte", "stand", "base", "pie", "mensula", "mount",
+  "funda", "case", "cover", "protector", "carcasa",
+  "cable", "cargador", "charger", "adaptador", "adapter",
+  "repuesto", "replacement", "refaccion",
+  "sticker", "skin", "vinilo",
+  "bolsa", "bag", "mochila",
+  "vidrio templado", "screen protector",
+];
+
 function isProductMatch(productName: string, queryTokens: string[]): boolean {
   if (queryTokens.length === 0) return true; // no tokens extracted = accept all
   const lower = productName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
+
+  // Reject items that are clearly accessories (soporte, funda, cable, etc.)
+  const lowerForAccessory = productName.toLowerCase();
+  const isAccessory = ACCESSORY_KEYWORDS.some((kw) => lowerForAccessory.includes(kw));
+  if (isAccessory) {
+    console.warn(`[MLProducts] ⚠ Rejected accessory: "${productName}"`);
+    return false;
+  }
+
   // At least ONE model token must be present in the product name
   return queryTokens.some((token) => lower.includes(token));
 }
